@@ -1,0 +1,200 @@
+﻿Universal Player Prop Pre-Bet Checklist (UDSS v3.1)
+ A single template you can run for any player and any prop type (rushing, receiving, passing, combos, TDs, tackles, kicking, etc.). Fill the core sections, then complete the relevant module(s) for the prop you’re betting.
+________________
+
+
+0) Intake (Auto-Gather First)
+● Player: ______________________
+● Prop & Line: ______________________ (e.g., Receiving Yards — 42.5)
+ ● Week / Date / Kickoff: ______________________
+● Position: QB / RB / WR / TE / K / DEF (IDP)
+● Team (Offense): ______________________
+● Opponent: ______________________
+● Home/Away: Home ☐ Away ☐
+● Stadium/Surface: Dome ☐ Open ☐ Turf ☐ Grass ☐
+● Weather (temp / wind / precip): ____° / ____ mph / ____
+Quick Intake Script (paste into your assistant to auto-fill):
+ “Collect position, team, opponent (next game/date), home/away, stadium/surface, weather, current best line + juice + alt lines, line movement (24h/72h), player status/practice log, snap/route/attempts last 3–5, season & last-5 stats vs the line (avg/median), relevant splits (home/away, favored/dog, man/zone, scheme), O-line vs front-7, and defense vs the prop type.”
+________________
+
+
+1) Market Context
+● Best line & book: __________________ (price: ___)
+ ● Consensus line: ______
+● Alt lines: __________________ (e.g., 37.5 / 47.5)
+ ● Movement (24h / 72h): ____ / ____
+● Market shape: Flat ☐ Split ☐ Steam w/ you ☐ Steam vs you ☐
+● News driver present? Yes ☐ No ☐ Notes: __________________________
+________________
+
+
+2) Player Availability & Role
+● Game status: Full ☐ Limited ☐ Q ☐ D ☐ Out ☐
+● Practice log (W/Th/F or equiv): ___ / ___ / ___
+● Recent snap share (G-1/G-2/G-3): ____% / ____% / ____%
+● Role today (check all): Early-downs ☐ Passing-downs ☐ Goal-line ☐ Slot ☐ X/Z ☐ In-line TE ☐ Primary Kicker ☐ LB1 ☐ Edge ☐ CB1 ☐ S ☐
+● Depth chart changes / call-ups: ______________________________________
+● Coach/beat notes (quotes, plans): ____________________________________
+________________
+
+
+3) Production vs Line (Hit Rates)
+● Season: Avg ____ Median ____ StDev ____ | Over line: ____ / ____ (%)
+● Last 5: Avg ____ Median ____ Trend (↑/↓/flat): ____ | Over: ____ / 5 (%)
+● Opponent history (2y): G ____ | Avg ____ | High ____ | Low ____
+● Key splits: Home ____ / Away ____ | Fav ____ / Dog ____ | Man ____ / Zone ____ | Pace up/down ____
+________________
+
+
+4) Usage & Efficiency (Universal)
+● Snaps/game: Season ____ | L5 ____
+● Routes/game (for WR/TE/RB/QB): Season ____ | L5 ____
+● Team share: Target % ____ | Rush share ____ | Air-yard share ____
+● Efficiency: YPRR ____ | YAC/rec ____ | aDOT ____ | YPC ____ | EPA/play ____
+● High-leverage: RZ touches ____ | Inside-5 opps ____ | 3rd/4th-down role ____
+● Volatility flags: Boom-bust ☐ Low volume ☐ Committee ☐
+Offensive Line & Protection
+ ● Run-block win rate / grade: __________
+● Pass-block win rate / pressure allowed: __________
+● OL injuries/returns: _________________________________________________
+● OL continuity index: ____ / 5 starters
+● Expected ΔT2T vs baseline: ____ ms (negative = faster release / less time)
+Scheme Snapshot (Offense & Defense)
+ (Add these quick fields to capture scheme effects without changing section numbering.)
+ Offense (the player’s team)
+ — Personnel mix (11%, 12%, 21%): ____ / ____ / ____
+— Formation & motion: Shotgun % ____ | Under center % ____ | Motion at snap % ____
+— Play style: Pass rate (neutral) ____% | RPO % ____ | Play-action % ____
+— QB usage: Designed runs/gm ____ | Scramble rate ____%
+Defense (opponent)
+ — Coverage: Man ____% | Zone ____% | Press ____%
+— Pressure: Pressure ____% | Blitz ____% | Sim pressure/creeper ____%
+— Special rules: Spy rate (est) ____% | Bracket/double on primary ____%
+— CB room quality: Outside CB grade (L/R): ___ / ___ | Slot: ___
+— Front discipline: Rush-lane/contain rank: ___/32
+________________
+
+
+5) Opponent Defense — Choose the Module(s)
+Complete the module(s) that match the prop type you’re betting.
+A) RUSH Module (RB/WR/QB rushing yards/attempts/TDs)
+ ● Defense vs run: Rush yards/gm ____ | YPC ____ | EPA/rush ____ | Success% ____
+● Explosive run rate allowed (10+): ____% | Stuff rate: ____%
+● Front-7 health / run D rank (DVOA/PFF): __________
+● Box counts (stacked %): ____% | Missed tackle% (run): ____%
+● Scheme match (wide zone / gap) vs defense strengths: __________________
+B) RECEIVE Module (WR/TE/RB receiving yards/receptions/targets/TDs)
+ ● Coverage & scheme: Man ____% | Zone ____% | Press ____% | Blitz ____%
+● Defense vs position: Yds/gm to WR ____ / TE ____ / RB ____ | Y/Tgt ____
+● Explosive pass rate allowed: ____% | YAC allowed: ____ | MT%: ____%
+● Primary matchup(s): CB/S/LB __________________ | Shadow risk: High ☐
+● Pass rush pressure rate: ____% (affects aDOT/time to throw)
+C) PASS Module (QB passing yards/attempts/completions/TD/INT)
+ ● Defense vs pass: EPA/db ____ | Success% ____ | Explosive pass% ____
+● Pressure / blitz: ____% / ____% | P2S%: ____% | Man/zone rates: /
+● INT rate: ____% | Coverage busts big-play%: ____%
+● OL pass-pro vs opp front (edge/DT health): ____________________________
+D) KICK Module (FG made/longest, PATs)
+ ● Team RZ TD% vs FG%: ____ / ____
+● Coach 4th-down aggressiveness: High ☐ Med ☐ Low ☐
+● Venue/weather: Dome ☐ Open ☐ | Wind ____ mph | Turf/grass ______
+● Kicker profiles: Career 50+% ____ | Accuracy ____% | Recent form ____
+● Opponent ST block/pressure rates: __________________________
+E) DEFENSE/IDP Module (tackles+assists, sacks, PDs)
+ ● Player role: LB1 ☐ LB2 ☐ Edge ☐ Box S ☐ Slot CB ☐ Outside CB ☐
+● Alignment (box% / slot% / deep%): ____ / ____ / ____
+● Team snap expectation: Pace ____ | Opponent plays/gm ____ | Run rate ____%
+● Tackle share / avg depth of tackle: ____% / ____ yds
+● Opponent run/pass tendency and completion%: ____ / ____ | ____%
+________________
+
+
+6) Game Environment
+● Spread / Total: ______ / ______ | Implied Team Total: ______
+● Likely script for your prop: Supports ☐ Neutral ☐ Opposes ☐ Why: ______
+● Rest / travel / short week: ___________________________________________
+* Quick sim hit-prob: ____% (If Over <46% → +1 risk to D; <42% → +2)
+________________
+
+
+7) Red Flags (Critical Overrides)
+● ☐ Snap cap (return from injury/conditioning)
+● ☐ Late downgrade / DNP
+● ☐ OL injuries materially change outlook
+● ☐ Severe weather for the prop type (wind/rain for passing/kicking; field for rushing)
+● ☐ Game-script risk opposite of prop
+● ☐ Market steam against (≥2.5 yards or ≥20¢) without new info
+● ☐ Role change / committee shift
+● ☐ Key teammate injury changes defensive attention (e.g., WR1 out)
+ ● ☐ OL continuity ≤ 3 starters (auto-PASS on QB/WR overs)
+● ☐ Credible plan to bracket TE/WR1 (apply constraint and re-score; likely PASS)
+________________
+
+
+8) UDSS Scoring (Universal)
+0–2 ✅ SAFE | 3–5 ⚠ RISKY | 6+ ❌ DANGEROUS. Any red-flag override = ❌
+A. Form vs Line (0–3 pts)
+ ● Season median vs line: ≥ line ☐ (0) | 0.5–2 under ☐ (+1) | ≥2.5 under ☐ (+2)
+● Last-5 median vs line: ≥ line ☐ (0) | 0.5–2 under ☐ (+1) | ≥2.5 under ☐ (+2)
+● Volume stability (snaps/routes/attempts): Stable ☐ (0) | Variable ☐ (+1)
+B. Role & Leverage (0–3 pts)
+ ● Primary role ☐ (0) | Split ☐ (+1) | Secondary ☐ (+2)
+● High-leverage share (RZ/inside-5/1st-read): Strong ☐ (0) | Mixed ☐ (+1) | Weak ☐ (+2)
+(Tweaked) C. Matchup Fit (0–3 pts)
+ ● C1. Defense vs prop type: Favorable ☐ (0) | Neutral ☐ (+1) | Tough ☐ (+2)
+● C2. Protection/Coverage fit: Edge O ☐ (0) | Even ☐ (+1) | Edge D ☐ (+1) (cap C total at 3)
+D. Environment & Market (0–2 pts)
+ ● Script/weather supportive and no steam vs you: Yes ☐ (0) | Mixed ☐ (+1) | Bad ☐ (+2)
+E. Constraint Flags (0–2 pts)
+ ● QB Rush Constraint (spy ≥12% OR zone ≥65% with top-10 contain) ☐ (+1)
+● Primary Receiver Constraint (double/bracket ≥35% AND ΔT2T ≤ −80 ms) ☐ (+1)
+Total UDSS Score: ______ → Rating: SAFE ☐ RISKY ☐ DANGEROUS ☐
+________________
+
+
+9) Final Call
+● Pick: Higher ☐ Lower ☐ Pass ☐
+● Unit size (0.25u–1u): ______
+● Reasoning (1–2 lines): ______________________________________________
+● Correlated angles (SGP/hedges): ______________________________________
+________________
+
+
+10) One-Minute Quick Pass (Universal)
+1. Role & volume today (snaps/routes/attempts primary?)
+
+2. Medians vs line (season & last-5)
+
+3. Defense vs prop type (fit + OL/coverage)
+
+4. Script & weather (supportive?)
+
+5. Market (no sharp steam against?)
+
+If ≥3 uncertain/bad → PASS.
+________________
+
+
+11) Data Dictionary (Universal)
+● YPRR / aDOT / YAC: Receiving efficiency & depth indicators.
+● EPA/play / Success rate: Drive-sustaining efficiency; context for matchup fit.
+● Explosive rate: % plays over big-gain thresholds (10+ rush, 15+ pass).
+● Run-/Pass-block win rate: OL vs DL ability to create/hold lanes.
+● Pressure/Blitz/P2S%: Pass rush environment affecting QBs/WRs/TEs.
+● Tackle share/ADT: IDP volume and role indicators.
+● Market steam: Rapid, multi-book moves often tied to fresh info.
+● OL continuity index: Count of normal starters available (0–5). Lower continuity → higher volatility, more protection risk.
+● ΔT2T (change in time-to-throw): Expected shift vs baseline due to OL vs pressure; negative = quicker throws (shallower routes/YAC dependency).
+● Spy rate: Estimated share of snaps with a true QB spy/green-dog; suppresses scramble yards.
+● Bracket/double (primary): Probability the defense devotes two to the top read (e.g., TE/WR1), reducing target share/aDOT.
+● Sim pressure/creeper: Four-man simulated pressures; boost pressure without blitzing, affecting aDOT and QB movement.
+● Rush-lane/contain rank: Discipline at keeping QBs in the pocket; higher rank → fewer scramble lanes.
+________________
+
+
+How to Use (examples)
+ “Run UDSS for James Cook — Rushing Yards 12.5 vs Dolphins.” → Fill RUSH module.
+“Run UDSS for Khalil Shakir — Receptions 3.5 vs Dolphins.” → Fill RECEIVE module.
+“Run UDSS for Josh Allen — Pass Yards 233.5 vs Dolphins.” → Fill PASS module.
+“Run UDSS for Kicker X — FGs Made 1.5.” → Fill KICK module.
+Tip: Duplicate this sheet per pick or print it.

@@ -1,0 +1,238 @@
+﻿Predictive Variables for Forecasting NFL Wide Receiver Receiving Yards
+Executive summary
+Forecasting a wide receiver’s next-game receiving yards is, in practice, forecasting (a) opportunity and (b) yards per opportunity, then adjusting for (c) game environment and (d) defensive interaction. The best-performing feature sets therefore concentrate on (1) who is on the field and running routes, (2) how targets are distributed, and (3) how deep those targets are, with context features acting as second-order corrections.
+Across modern public data (2016+), the most predictive families are:
+* Expected opportunity (dominant): route participation (or pass-play participation), target share, and team-level dropbacks/pass intent. These features are available via play-by-play and participation datasets (players on field, formations/personnel) and allow you to predict targets rather than use realized targets (avoids leakage). 
+* Depth and “yardage potential”: receiving air yards, aDOT/average air distance, and air-yards share (often combined into composite opportunity metrics like WOPR). 
+* Efficiency and separation/YAC context: catchability/accuracy (QB), and receiver separation / expected YAC features provide incremental lift, especially to distinguish “meet vs greatly exceed” outcomes among similarly targeted receivers. 
+* Game environment and market expectations: pregame spread/total (and derived implied team points / expected script) is a robust “information aggregator” that often carries hidden injury/scheme/weather signals. These fields are directly available in the nflverse schedule file (spread_line, total_line, moneylines, rest days). 
+* Opponent defense: pressure and coverage tendencies (man/zone, coverage shells) and pass efficiency allowed add value, and—crucially for a decision tree—create highly interpretable splits (“vs Cover 3 heavy teams”, “vs high-pressure defenses”). 
+* Availability (injuries) and weather: injury status/practice participation and wind/temperature/roof are typically smaller effects than volume and script, but matter for tail outcomes (big misses and big spikes), and help stabilize your “greatly exceed / fall below” classes. 
+A practical workflow for “large decision tree classification” is to (1) build a high-accuracy boosted tree to identify the strongest variables, then (2) train a single pruned tree (or a tree distilled from the boosted model) using the top features for interpretability, with cost-complexity pruning to control overfitting. 
+Data sources, time span, and granularity
+A modern, high-signal public stack is built around the nflverse data releases plus official NFL pages. This stack is strong because it includes play-level participation and coverage labels, not just box scores. 
+Recommended core datasets
+Play-by-play (1999–present; play-level → game-level aggregates)
+* nflverse play-by-play is available back to 1999 and can be loaded for all seasons; it includes key pass concepts like air_yards and yards_after_catch, plus EPA/WP fields that help derive team/pass efficiency context. 
+Schedules + betting lines + rest (game-level; includes spread/total):
+* The schedule file includes spread_line, total_line, moneylines, and rest fields (away_rest/home_rest), which are extremely useful “game script priors.” 
+Next Gen Stats weekly player stats (2016–present; week-level with week==0 season summary):
+* Weekly receiving includes targets, yards, avg_air_distance (aDOT), avg_cushion, avg_separation, catch_percentage, avg_expected_yac, and avg_yac_above_expectation; passing includes expected completion and completion_percentage_above_expectation (CPOE). 
+Participation + route + coverage labels (2016–present; play-level):
+* Participation data includes players_on_play/offense_players, offensive formation/personnel, defender counts/pressure indicators, and critically route, defense_man_zone_type, and defense_coverage_type. 
+* This directly supports many of the “scheme / coverage / route participation” features you listed, using public data.
+Injury reports (2009–present; weekly; practice participation + game status):
+* The injury dataset includes report_status and practice_status, letting you model “questionable + limited” differently than “full participant,” which is aligned with league reporting structure. 
+Snap counts (2012–present; game-level):
+* Snap counts are sourced from Pro Football Reference and made available in nflverse as game-level offensive/defensive/ST snaps and percentages. 
+Official / primary NFL sources that pair well with the above
+* NFL injury reporting rules and timing: the injury report policy describes how practice participation is reported and why listed statuses exist. 
+* Next Gen tracking technology overview: explains RFID tracking infrastructure used to generate tracking-derived stats. 
+* Official current injury lists: NFL injuries page provides the “live” view for the current week (useful for building your real-time pipeline). 
+* xYAC definition and intent: explains expected YAC as a tracking-informed expectation baseline. 
+Weather sources
+* Primary weather archive (recommended for modeling): NOAA National Centers for Environmental Information “Global Hourly” / Integrated Surface Database provides hourly observations at thousands of stations. 
+* Aviation METAR feeds: useful for stadium-near airport observations; best for recent/historical lookups. 
+Best-practice time span and granularity choices
+If you want maximum predictive accuracy with the richest public features, use:
+* Time span: 2016–present (unifies Next Gen weekly stats + participation/coverage + play-by-play). 
+* Primary modeling table: player-game level (one row per WR per game), with features computed from:
+   * play-level participation (routes, coverages, on-field presence) 
+   * game-level snap counts, schedule lines, weather summaries 
+   * week-level Next Gen receiving/passing stats (joined by week/season) 
+If you must go back to 1999 for sample size (e.g., for era-scale models), you’ll lose several high-signal columns (NGS, participation routes/coverage, snap counts), so accuracy is usually lower even with more rows. 
+Preprocessing and feature engineering approach
+Define the prediction task precisely to prevent leakage
+For “will a receiver exceed vs meet vs fall below their average,” define:
+* Target: next-game receiving yards (regression) or a 3-class label derived from next-game yards.
+* Baseline “average yards”: must be computed using only games prior to the predicted game (e.g., rolling last 8 games, season-to-date excluding current week).
+* Example classing (interpretable and stable):
+   * greatly exceed: yards ≥ 1.40 × baseline
+   * meet: 0.70–1.40 × baseline
+   * fall below: yards ≤ 0.70 × baseline
+This ratio label keeps the tree’s splits meaningful across WR tiers (stars vs role players) and reduces heteroskedasticity. (The exact thresholds should be tuned for class balance.)
+Join keys and “single source of truth” IDs
+A repeatable pipeline hinges on consistent IDs:
+* Use the nflverse players table as the crosswalk for GSIS and other IDs (“single source of truth” design). 
+* Standardize to:
+   * game_id (nflverse game key) 
+   * play_id for play-level joins (pbp ↔ participation) 
+   * player_gsis_id / gsis_id for player joins across injuries, NGS, participation, and pbp. 
+Core preprocessing steps
+* Filter to “meaningful WR games” to reduce noise: e.g., WRs with ≥10 offensive snaps or ≥5 routes/pass-play participations (computed from participation), and ensure the player is listed as WR in at least one source. 
+* Handle structural missingness explicitly (tree models like explicit “missing” bins):
+   * NGS stats only exist for players above minimum attempts thresholds (do not impute as zero; encode “NGS_missing”). 
+   * Participation/coverage labels differ by season provider; encode “provider/era” as a feature to let the tree learn regime shifts. 
+* Weather: play-by-play contains a weather string that can be missing/inconsistent; if weather matters, prefer NOAA station-based values (wind/temp/precip) and aggregate to kickoff ± in-game window. 
+Feature engineering patterns that work well for trees
+* Shift everything by 1 game/week (or by date) so no future info leaks into predictors.
+* Use rolling windows at multiple half-lives: last 3, last 8, and season-to-date (trees often split differently early vs late season).
+* Opponent-adjusted deltas: e.g., (WR target share last 8) − (opponent target share allowed to WRs last 8).
+* Composite opportunity metrics: WOPR combines target_share and air_yards_share into one opportunity score; RACR captures conversion of air yards to receiving yards. 
+* Route/coverage interaction features (highly interpretable splits): e.g., “WR slant rate” vs “opponent man rate,” since participation data includes both route and coverage labels. 
+Ranked table of the top predictive variables
+The ranked features below are designed to be available pregame by using trailing/rolling summaries (not same-game targets), while still capturing the strongest drivers of receiving yards. Most can be built from play-by-play + schedules + participation + NGS, with injuries and snap counts adding availability context. 
+Rank
+	Variable (player-game)
+	Why it is highly predictive
+	Suggested transformations for a decision tree
+	1
+	Expected targets (next game)
+	Targets are the most direct “opportunity” driver; predicting targets avoids leakage and stabilizes yard forecasts.
+	Build a targets model: trailing target_share × expected team dropbacks. Use EWMA(3/8) target_share; cap outliers; add teammate-absence adjustments.
+	2
+	Pass-play participation / route participation
+	If the WR isn’t on the field on dropbacks, yards ceiling collapses. Participation data lists offense_players per play. 
+	From participation: % of team dropbacks where WR is in offense_players; compute last 3/8 games; add “starting vs rotational” bins.
+	3
+	Target share (rolling)
+	Decouples player usage from game pace; also robust across opponents.
+	EWMA target_share; compute slope (last 3 minus last 8); include intra-season rank on team. WOPR uses target_share. 
+	4
+	Receiving air yards (rolling)
+	Captures downfield usage; air_yards is defined at target point and drives yard potential. 
+	EWMA receiving_air_yards; split into short/deep share using aDOT bins; include boom-bust indicator (high air yards variance).
+	5
+	Air-yards share (rolling)
+	Team-context normalization for deep usage; materially improves “exceed vs meet” classification. WOPR uses air_yards_share. 
+	EWMA air_yards_share; compute WOPR; add “high share + low RACR” (positive regression candidates) split. 
+	6
+	aDOT / avg air distance
+	Separates high-volume shallow roles from lower-volume deep threats; affects yard distribution and variance. 
+	Use NGS avg_air_distance or pbp air_yards/targets; bin into shallow/medium/deep; include interaction with expected targets.
+	7
+	Team expected dropbacks / pass attempts
+	Team volume is a hard ceiling/floor for WR yardage.
+	Predict team dropbacks using trailing pace + PROE-like intent (xpass-based) + spread/total; include bins for high/low tempo. 
+	8
+	Game total line (over/under)
+	Strong prior for overall scoring and play volume; often embeds injuries/weather in market pricing. total_line is available in schedules. 
+	Use total_line; derive implied team points; also include “high-total close spread” vs “low-total blowout” categories.
+	9
+	Point spread / win probability proxy
+	Game script shifts pass volume and late-game target patterns. spread_line exists in schedules. 
+	Use spread_line plus bins: favorite/underdog by tiers; interact with team pass intent.
+	10
+	Receiver efficiency: yards per target / yards per route
+	Separates “empty targets” from real yard production; helps among similarly targeted players.
+	Rolling yards/target and (yards ÷ pass-play participations). Add regression-to-mean: shrink to league avg by sample size.
+	11
+	RACR (receiving_yards ÷ receiving_air_yards)
+	Measures conversion of air yards into receiving yards; helps predict whether deep usage turns into actual yards. 
+	Compute RACR over last 8; winsorize extremes; interact with aDOT and QB accuracy metrics. 
+	12
+	Expected YAC and YAC above expectation
+	Distinguishes receivers who create after catch vs those dependent on depth alone; NGS provides expected YAC and above expectation. 
+	Use avg_expected_yac and avg_yac_above_expectation; bin “high separation + high YACAE” archetypes.
+	13
+	QB accuracy / CPOE-type metric
+	Receiver yard outcomes depend on catchable volume; NGS provides expected completion and completion above expectation. 
+	Rolling QB completion_percentage_above_expectation; include QB aDOT; interaction with WR aDOT (deep accuracy matters more).
+	14
+	Opponent pass defense efficiency allowed
+	Defensive ability strongly affects completion/yard efficiency; pbp contains EPA per play. 
+	Rolling defensive EPA allowed per dropback; explosive pass rate allowed; opponent-adjust WR expected yards/target down.
+	15
+	Opponent pressure rate + QB time-to-throw context
+	Pressure changes depth and target timing; participation includes was_pressure and time_to_throw. 
+	Compute opponent pressure rate (last 8), QB time_to_throw (last 8), and interaction bins (slow QB vs high pressure).
+	16
+	Opponent man/zone and coverage shell rates
+	Directly affects route success and target selection; participation includes man/zone and coverage type. 
+	Opponent % man, % Cover_3, % Cover_1, etc; create matchup flags (WR role vs opponent shell).
+	17
+	Receiver route mix / archetype
+	Route distribution predicts depth and target type; participation includes route label set. 
+	Last-8 route shares (e.g., screen/slant/go/dig); compress via PCA-like buckets or simple “short vs intermediate vs deep route rate.”
+	18
+	High-value target indicators (red zone / end zone usage)
+	A WR can “exceed” on a few high-leverage deep or end-zone looks; helps classify tail outcomes.
+	Build red-zone target rate and end-zone target rate from pbp field position, rolling window; interact with team implied points.
+	19
+	Injury/practice participation status (WR + QB + key teammates)
+	Availability and effectiveness hinge on practice status and game status reporting. 
+	Encode practice_status (DNP/LP/FP) and report_status; build teammate-absence features for target competition changes. 
+	20
+	Weather + roof/venue conditions
+	Wind/cold shift teams toward conservative passing; effects are strongest at extremes. NOAA provides hourly wind/temp; indoor roofs stabilize. 
+	Use kickoff wind speed bins (e.g., <10 / 10–15 / >15 mph), temp bins, precip flag; add roof/dome indicator; interact with aDOT/deep rate.
+	Notes on interpretability: the “coverage + route mix” features (ranks 16–17) are particularly valuable for a large decision tree, because they produce split rules that coaches/analysts immediately understand (“man-heavy defense + high slant rate + high expected targets”). 
+Tree-based models and feature-importance methods
+Models to consider
+A single large decision tree is easy to communicate, but it is also prone to overfitting; controlling complexity is essential. 
+* CART decision tree (classification/regression): start here for interpretability; tune max_depth, min_samples_leaf, and use cost-complexity pruning (ccp_alpha) to keep the tree stable out-of-sample. 
+* Random Forest / ExtraTrees: strong for feature screening and nonlinearity, less interpretable globally. (Often useful to identify that “expected targets” dominates before you build the final big tree.)
+* Gradient-Boosted Trees (XGBoost/LightGBM/CatBoost): typically the highest accuracy on tabular sports data; use these to (a) baseline your attainable performance, and (b) rank features before distilling into a single tree. Feature importance can be summarized via “gain / cover / frequency.” 
+Feature importance and explanation methods
+For robust “most predictive variable” claims, use multiple importance views:
+* Permutation importance (model-agnostic): measures score drop when a feature is shuffled. 
+* Tree gain importance (boosted trees): e.g., XGBoost’s Gain, Cover, Frequency. 
+* SHAP values (global + local): provides consistent per-feature attribution and is well-suited to tree ensembles. 
+One caveat: permutation importance can behave misleadingly under strong multicollinearity (common here: targets, target_share, WOPR, routes are correlated). Plan to group correlated features or evaluate drop-column importance to avoid “all features look unimportant.” 
+Validation strategy for credible out-of-sample performance
+Splitting strategy
+Because the NFL is non-stationary (scheme trends, season-to-season rule emphasis, roster turnover), use time-aware validation:
+* Holdout seasons (recommended default): Train on 2016–2022, validate on 2023–2024, final test on 2025 (example). This aligns with modern data availability (NGS and participation since 2016). 
+* Rolling-origin backtesting: multiple folds where each fold trains on seasons ≤Y and tests on Y+1 (or a block). This reduces the risk that your results depend on one unusual season.
+Cross-validation details that matter for WR yards
+* Group-aware evaluation: if you evaluate at player-game level, ensure the model isn’t effectively memorizing a player’s season via leakage. Use player-season grouping for certain CV analyses (or at least ensure strict chronological feature shifting).
+* Metrics:
+   * Regression: MAE (business-friendly), RMSE (penalizes big misses), and calibration plots of predicted vs actual quantiles.
+   * 3-class classification: macro-F1 (balances classes), balanced accuracy, and probability calibration (Brier score / reliability curves) if you will use probabilities.
+Baselines to include
+* “Rolling average only” baseline: predict next-game yards as trailing 8-game mean.
+* “Targets-only” baseline: predicted targets × trailing yards/target.
+If your fancy model doesn’t beat these by a meaningful margin, you likely have leakage or data quality issues.
+Pitfalls and limitations to expect
+   * Leakage via same-game opportunity: realized targets, routes, snap counts, and in-game script are outcomes, not predictors. If you include same-game targets you will inflate accuracy artificially. Participation data is play-level; treat it as historical-only for pregame models. 
+   * NGS availability thresholds: weekly NGS stats only appear for players above minimum attempts; missingness is informative and should be modeled, not naively imputed. 
+   * Provider/era inconsistency: participation data source switches (NGS earlier, FTN Data for 2023+), so distributions of route/coverage labels can shift. Encode season/provider to reduce silent drift. 
+   * Weather data quality: play-by-play may include a single weather string that can be missing or inconsistent; using NOAA station data is more defensible, but requires careful stadium-station matching and time-window aggregation. 
+   * Collinearity and “importance inflation/deflation”: targets, target_share, WOPR, and routes are tightly coupled; impurity- and permutation-based importance may split credit unpredictably. Use grouped importance and SHAP interaction views. 
+   * Small samples for route/coverage matchups: receiver performance vs a specific coverage shell or route type can be sparse; trees will happily overfit unless you enforce min_samples_leaf and prune. 
+   * Market lines as “too good”: spread/total improves accuracy partly because it aggregates hidden info. That’s useful, but it can also mask whether your football features are genuinely predictive; report performance with and without market features. 
+   * Changing offensive roles mid-season: trades, injuries to other receivers, and coaching changes can abruptly alter target hierarchies. Your model should include “recent slope” features and teammate-availability indicators (from injuries/rosters). 
+Sample data pipeline flowchart
+mermaid
+flowchart LR
+  subgraph Ingest
+    A[pbp: play-by-play (1999+)]
+    B[schedules: lines, totals, rest]
+    C[participation: players on field, route, coverage, pressure (2016+)]
+    D[nextgen: weekly receiving & passing metrics (2016+)]
+    E[injuries: practice status & game status (2009+)]
+    F[snap counts (2012+)]
+    G[weather: NOAA hourly station data]
+  end
+
+
+  subgraph Build
+    H[Normalize IDs: gsis_id/player ids, game_id, play_id]
+    I[Create pregame feature windows: last 3/8 games, season-to-date]
+    J[Engineer features: expected targets, WOPR-like opportunity, matchup & script]
+    K[Label: yards and exceed/meet/fall-below vs rolling baseline]
+  end
+
+
+  subgraph Model
+    L[Time-based split: rolling-origin CV + holdout seasons]
+    M[Train: boosted trees for accuracy + feature ranking]
+    N[Distill: single large tree with pruning for interpretability]
+    O[Explain: SHAP + permutation + stability checks]
+  end
+
+
+  subgraph Deploy
+    P[Weekly scoring: pregame features -> predicted yards & class probs]
+    Q[Monitoring: drift, missingness, recalibration, retrain cadence]
+  end
+
+
+  A --> H
+  B --> H
+  C --> H
+  D --> H
+  E --> H
+  F --> H
+  G --> H
+  H --> I --> J --> K --> L --> M --> N --> O --> P --> Q

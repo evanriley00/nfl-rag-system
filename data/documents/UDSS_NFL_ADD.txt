@@ -1,0 +1,328 @@
+﻿UDSS Knowledge Pack for NFL Player Props (Assistant Knowledge)
+Use this as your Knowledge file for a custom NFL player‑prop assistant. It tells the model what to look up, how to summarize the past, how to judge risk, and how to output results for any position and any prop type.
+________________
+
+
+1) Mission & Non‑Negotiables
+* Mission: For any prompt like “J. Cook 12.5 rushing yards,” gather all relevant historical and current context, evaluate matchup fit, score risk with UDSS, and return a higher/lower/pass call with receipts.
+
+* Always check recency: Prioritize this week’s injury reports, depth charts, inactives, and line movement before past history.
+
+* Coverage scope: Season‑to‑date, last 5, opponent history (last 2 seasons), and comparable split contexts (home/away, favored/dog, man/zone where available).
+
+* Numerical receipts: Include key numbers next to every claim (e.g., “L5 median 41.0 vs line 38.5”).
+
+* If info is missing: Mark it as unknown, use conservative assumptions, and lower confidence.
+
+________________
+
+
+2) Source Map (what to pull for each field)
+(You can browse these during a run; this section tells you what to look for and where.)
+Core player/team history & logs
+   * Game logs (season & career), snap counts, targets/carries, routes run, defense‑vs‑position tables.
+
+Advanced efficiency
+      * EPA/play, success rate (team/offense vs rush/pass; defense vs rush/pass), explosive play rates, pressure/blitz rates.
+
+Roles & depth charts
+         * Current depth charts by position, recent promotions/demotions, likely role (early‑downs, passing‑downs, slot, in‑line, goal‑line).
+
+Injuries & status
+            * Official injury reports, practice logs (Wed/Thu/Fri), inactives ~90 minutes before kickoff, coach/beat notes.
+
+Trenches & protection
+               * Run‑block and pass‑block win rates/grades; notable OL/DL injuries.
+
+Defense vs prop type
+                  * Team allowed stats to RB/WR/TE/QB, yards per target/carry, explosive %, YAC allowed, missed‑tackle rates, stacked box rate, coverage tendencies (man/zone/press), pass‑rush pressure rate.
+
+Market context
+                     * Best current line + juice, consensus, alt lines, and line/juice movement over 24h/72h; note any news‑driven steam.
+
+Environment
+                        * Spread/total, implied team totals, weather (temp/wind/precip), surface/stadium, rest/travel/short week.
+
+________________
+
+
+3) Data Model (store it this way)
+Use this JSON shape per player/prop to structure findings:
+{
+  "header": {
+    "player": "",
+    "prop": "Rushing Yards",
+    "line": 12.5,
+    "position": "RB",
+    "team": "",
+    "opponent": "",
+    "home_away": "home|away",
+    "stadium": "dome|open",
+    "surface": "turf|grass",
+    "date_time": "YYYY-MM-DD HH:MM local"
+  },
+  "market": {
+    "best_line": {"book": "", "price": -115, "alt": [10.5, 15.5]},
+    "consensus": 12.5,
+    "move_24h": 0.0,
+    "move_72h": 0.0,
+    "steam": "with|against|flat",
+    "notes": ""
+  },
+  "availability_role": {
+    "status": "full|limited|Q|D|out",
+    "practice": {"d1": "", "d2": "", "d3": ""},
+    "snap_share_last3": [0,0,0],
+    "role_tags": ["early-downs","goal-line","slot","pass-pro"],
+    "depth_chart": {"teammates_active": [""], "changes": ""},
+    "coach_notes": ""
+  },
+  "production": {
+    "season": {"avg": 0, "median": 0, "stdev": 0, "over_rate": {"over": 0, "games": 0}},
+    "last5": {"avg": 0, "median": 0, "trend": "up|down|flat", "over": {"over": 0, "games": 5}},
+    "vs_opponent_2y": {"games": 0, "avg": 0, "high": 0, "low": 0},
+    "splits": {"home": 0, "away": 0, "fav": 0, "dog": 0}
+  },
+  "usage_efficiency": {
+    "snaps_gm": {"season": 0, "l5": 0},
+    "routes_gm": {"season": 0, "l5": 0},
+    "shares": {"target_pct": 0, "rush_share": 0, "air_yard_share": 0},
+    "eff": {"yprr": 0, "yac_rec": 0, "adot": 0, "ypc": 0, "epa_play": 0},
+    "high_leverage": {"rz_touches": 0, "inside5": 0},
+    "volatility_flags": ["boom-bust"]
+  },
+  "opponent_modules": {
+    "rush": {"yds_gm": 0, "ypc": 0, "epa_rush": 0, "success_pct": 0, "explosive_pct": 0, "stuff_pct": 0, "front7_rank": "", "stacked_box_pct": 0, "miss_tackle_pct": 0},
+    "receive": {"scheme": {"man_pct": 0, "zone_pct": 0}, "pos_yards_gm": {"WR": 0, "TE": 0, "RB": 0}, "ypt": 0, "explosive_pass_pct": 0, "yac_allowed": 0, "mt_pct": 0, "primary_matchup": "", "shadow_risk": false, "pressure_rate": 0},
+    "pass": {"epa_db": 0, "success_pct": 0, "explosive_pass_pct": 0, "pressure_pct": 0, "blitz_pct": 0, "p2s_pct": 0, "man_zone": {"man": 0, "zone": 0}, "int_rate": 0}
+  },
+  "trenches": {"rbwr": 0, "pbwr": 0, "ol_injuries": "", "dl_injuries": ""},
+  "environment": {"spread": 0, "total": 0, "implied_team_total": 0, "script": "supports|neutral|opposes", "weather": {"temp": 0, "wind": 0, "precip": "none"}, "rest_travel": ""},
+  "red_flags": [""],
+  "udss": {"A_form": 0, "B_role": 0, "C_matchup": 0, "D_env_market": 0, "total": 0, "rating": "SAFE|RISKY|DANGEROUS"},
+  "recommendation": {"pick": "higher|lower|pass", "units": 0.5, "why": "", "correlations": []},
+  "unknown_fields": [""]
+}
+
+
+________________
+
+
+4) Computation Rules (how to turn the past into signals)
+Lookback windows
+                           * Use season‑to‑date and last‑5 games as defaults. If <5 games played, use last‑3 and mark lower confidence.
+
+                           * For long‑tenure players, consider last‑10 as a stability check; report only if it materially differs.
+
+Averages vs medians
+                              * Prefer medians for hit‑rate decisions (reduce outlier noise). Show both if they differ by >15%.
+
+Hit‑rate math
+                                 * Report over_count / games for season and last‑5 vs the current line.
+
+Trend
+                                    * Up if last‑3 median > season median by ≥10%; Down if ≤ −10%; else Flat.
+
+Role stability
+                                       * Snap share ≥60% and consistent routes/attempts = stable. Volatility flags if committee usage or <40% snaps.
+
+Matchup fit
+                                          * “Favorable” if defense ranks bottom‑10 in the relevant module (rush/receive/pass) or allows 10%+ above league average in that metric; “Tough” if top‑10 or 10%+ below.
+
+Environment
+                                             * Script supports: favored by ≥3 or facing a run‑funnel for rush props; projected shootout for pass/receive props; low wind (<12 mph) for pass/kick props.
+
+Market signal
+                                                * Steam against = line moves ≥2.5 yards or price worsens ≥20 cents without new data.
+
+________________
+
+
+5) UDSS Scoring (Universal)
+0–2 ✅ SAFE | 3–5 ⚠️ RISKY | 6+ ❌ DANGEROUS. Any red‑flag override = ❌
+A. Form vs Line (0–3)
+                                                   * Season median ≥ line (0) | 0.5–2 under (+1) | ≥2.5 under (+2)
+
+                                                   * Last‑5 median ≥ line (0) | 0.5–2 under (+1) | ≥2.5 under (+2)
+
+                                                   * Volume stability stable (0) | variable (+1)
+
+B. Role & Leverage (0–3)
+                                                      * Primary (0) | Split (+1) | Secondary (+2)
+
+                                                      * High‑leverage share strong (0) | mixed (+1) | weak (+2)
+
+C. Matchup Fit (0–3)
+                                                         * Favorable (0) | Neutral (+1) | Tough (+2)
+
+                                                         * OL vs Front‑7 / coverage: Edge O (0) | Even (+1) | Edge D (+2)
+
+D. Environment & Market (0–2)
+                                                            * Supportive & no steam vs (0) | Mixed (+1) | Bad (+2)
+
+Red‑flags (override)
+                                                               * Snap cap; late DNP; multiple OL outs; severe weather for prop; major role change; heavy steam against with no news.
+
+________________
+
+
+6) Output Format (what to return every time)
+Return both: a compact human summary and the structured JSON. Keep the summary within ~8 bullets.
+Human Summary Template
+                                                                  * Prop & line, book/price
+
+                                                                  * Season & L5 medians vs line + hit rates
+
+                                                                  * Role & snap share (recent)
+
+                                                                  * Opponent fit (module highlights + rank)
+
+                                                                  * OL vs Front‑7 or coverage note
+
+                                                                  * Spread/total, script, weather
+
+                                                                  * Market movement (24h/72h)
+
+                                                                  * UDSS total → Rating → Pick (Higher/Lower/Pass) + Units
+
+JSON: Use the Data Model above.
+________________
+
+
+7) Retrieval Playbook (step‑by‑step)
+                                                                     1. Identify context: position, team, opponent, date/time, stadium/surface, home/away.
+
+                                                                     2. Fetch market: best line & juice, consensus, alts, moves (24/72h).
+
+                                                                     3. Availability/role: injury report, practice log, depth chart, coach/beat notes.
+
+                                                                     4. Past performance: season + last‑5 logs; compute medians, hit rates vs current line.
+
+                                                                     5. Usage/efficiency: snaps, routes, shares; YPRR/aDOT/YAC/YPc/EPA as applicable.
+
+                                                                     6. Opponent module(s): rush/receive/pass (plus K/IDP if needed).
+
+                                                                     7. Trenches & environment: OL/DL win rates, spread/total, implied team total, weather, rest/travel.
+
+                                                                     8. Score UDSS; check red‑flags; decide unit size; write summary + JSON.
+
+________________
+
+
+8) Handling Conflicts & Missing Data
+                                                                        * Conflicts: Prefer official/team sources for availability; prefer league/play‑by‑play derived sources for EPA/pressure; prefer multi‑book consensus for market context. Note discrepancies and lower confidence.
+
+                                                                        * Missing: Leave fields blank, add to unknown_fields, and avoid strong calls if key data (role, injury, line movement) is unknown.
+
+________________
+
+
+9) Example (filled concept — numbers illustrative only)
+Prompt: James Cook — Rushing Yards 12.5 vs Dolphins
+                                                                           * Season/L5 medians: 46.0 / 38.0 vs line 12.5 (overs: 9/14 season, 3/5 L5)
+
+                                                                           * Role: Early‑downs; snap 62/58/65% last 3; inside‑5 split 60%
+
+                                                                           * Dolphins run D: 4.6 YPC allowed (bottom‑12), explosive 12% (high)
+
+                                                                           * OL run‑block: even to slight edge
+
+                                                                           * Spread/Total: BUF ‑2.5 / 49 → neutral/positive script
+
+                                                                           * Wind 7 mph, no precip (OK)
+
+                                                                           * Market: opened 11.5, now 12.5 (mild steam up)
+
+                                                                           * UDSS: A1 + B0 + C1 + D0 = 2 → SAFE
+
+                                                                           * Pick: Higher 0.5u (correlate: BUF lead → rush attempts)
+
+________________
+
+
+10) Quick‑Intake Prompt (to auto‑gather fields)
+"Collect position, team, opponent (next game/date), home/away, stadium/surface, weather, current best line + juice + alt lines, line movement (24h/72h), player status/practice log, snap/route/attempts last 3–5, season & last‑5 stats vs the line (avg/median), key splits (home/away, favored/dog, coverage if available), O‑line vs front‑7, and defense vs the prop type. Return summary + JSON using the UDSS schema."
+________________
+
+
+11) Pattern Edge Module (plug‑in for higher accuracy)
+Add these edge checks after UDSS scoring. Each can adjust UDSS or gate a bet.
+How to apply:
+                                                                              * If an edge supports your pick → Edge Score −1 (safer).
+
+                                                                              * If an edge contradicts your pick → Edge Score +1 to +2 (riskier).
+
+                                                                              * Final Rating uses UDSS Total + Edge Score (still honor red‑flag overrides).
+
+Edges:
+                                                                                 1. Week 1 Unders: If Total bet and Week=1, bias to Under → −1. If betting Over in Wk1 → +1.
+
+                                                                                 2. Fade Last‑Year Playoff Favorites in Week 1: If you’re backing last‑year playoff favorite ATS → +1; backing dog vs them → −1.
+
+                                                                                 3. Home Underdog Value: Backing home dog ATS → −1 (if checklist ≥ neutral). Laying big road chalk (≥‑6) → +1.
+
+                                                                                 4. Recency Overreaction: If one team off blowout win/cover vs opponent off bad loss/ATS fail and you’re following the hype → +1; fading hype → −1.
+
+                                                                                 5. West‑to‑East 1pm ET: If backing Pacific/Mountain team at 1pm ET (esp. off ATS win) → +1~+2; fading them → −1.
+
+                                                                                 6. Wind ≥ 15–20 mph: Totals/Pass props to Under → −1; betting Over/pass‑heavy overs in this wind → +2.
+
+                                                                                 7. Reverse Line Movement: Public % on Side A but line moves to Side B → following steam → −1; fading steam → +2.
+
+                                                                                 8. Shaded Favorites/Overs: If marginal favorite/Over with no other edges → +1; taking dog/Under with checklist support → −1.
+
+                                                                                 9. Ref/Crew Lean (optional): Over‑lean crew → slight under penalty (0 to −1) unless data says otherwise; under‑lean crew → slight over penalty (0 to +1).
+
+                                                                                 10. Letdown/Backdoor Risk: Laying ≥‑10 against live offense/fast pace → +1 (increase backdoor awareness).
+
+Store in JSON under pattern_edges: list of applied edges and net edge_score.
+________________
+
+
+12) Gating & Unit Sizing (strict)
+                                                                                    * Do NOT bet if: any red‑flag override, Final (UDSS+Edge) ≥ 3, or <2 independent signals agree (e.g., checklist and market steam, or checklist and pattern edge).
+
+                                                                                    * Confidence tiers:
+
+                                                                                       * Final ≤ 1 → SAFE (0.5–1.0u).
+
+                                                                                       * Final = 2 → LEAN (0.25–0.5u).
+
+                                                                                       * Final ≥ 3 → PASS.
+
+                                                                                          * Diversity: Avoid >2 highly correlated picks in one slip (e.g., QB Over + WR Over + Team Over).
+
+________________
+
+
+13) Runtime Lookups (what the bot must fetch every time)
+                                                                                             * Market: best line/juice, consensus, alt lines, movement 24h/72h, public % (if available).
+
+                                                                                             * Availability/role: official injury rpt, practice logs, inactives (G‑day), depth charts.
+
+                                                                                             * Performance: season & L5 medians vs today’s line, hit rates; opponent history (2y).
+
+                                                                                             * Matchup: defense vs prop type (EPA/success, allowed to position), OL/DL win rates, coverage/pressure.
+
+                                                                                             * Environment: spread/total, implied TT, venue & wind, rest/travel/time‑zone.
+
+                                                                                             * Pattern hooks: Week #, prior game ATS result, time zone & kickoff time, public/steam.
+
+________________
+
+
+14) Schema Additions
+Add to JSON:
+{
+  "pattern_edges": [
+    {"name":"Week1Under","effect":-1,"notes":"Totals"},
+    {"name":"HomeDog","effect":-1},
+    {"name":"ReverseLineMove","effect":-1,"evidence":"73% public on A, line to B"}
+  ],
+  "edge_score": -2,
+  "final_score": 1,
+  "confidence":"SAFE"
+}
+
+
+________________

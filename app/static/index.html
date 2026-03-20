@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GridMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">NFL RAG WORKBENCH</p>
+        <h1>GridMind turns your football notes into a searchable scouting assistant.</h1>
+        <p class="hero-text">
+          Ask grounded questions over coverage notes, scouting reports, and matchup summaries.
+          Rebuild the index any time your document set changes.
+        </p>
+      </div>
+      <div class="hero-card">
+        <div class="hero-metric">
+          <span class="metric-label">API</span>
+          <span id="health-badge" class="metric-value pending">Checking...</span>
+        </div>
+        <div class="hero-metric">
+          <span class="metric-label">Default Retrieval</span>
+          <span class="metric-value">Top <span id="top-k-value">4</span> chunks</span>
+        </div>
+        <button id="ingest-button" class="primary-button" type="button">Rebuild Document Index</button>
+        <p id="ingest-status" class="inline-status">Ready to ingest local notes.</p>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel ask-panel">
+        <div class="panel-header">
+          <h2>Upload documents</h2>
+          <p>Add your own `.txt`, `.md`, or `.pdf` notes, then rebuild the index.</p>
+        </div>
+
+        <div class="upload-panel">
+          <input id="file-input" class="file-input" type="file" accept=".txt,.md,.pdf">
+          <div class="upload-actions">
+            <button id="upload-button" class="secondary-button" type="button">Upload File</button>
+            <span id="upload-status" class="inline-status">No file selected yet.</span>
+          </div>
+        </div>
+
+        <div class="panel-header">
+          <h2>Ask the system</h2>
+          <p>Try a football question grounded in the sample documents.</p>
+        </div>
+
+        <form id="query-form" class="query-form">
+          <label class="field-label" for="question">Question</label>
+          <textarea id="question" name="question" rows="4" placeholder="How can a receiver stress Cover 3?"></textarea>
+
+          <div class="form-row">
+            <div class="field-group compact">
+              <label class="field-label" for="top-k">Top K</label>
+              <input id="top-k" name="top_k" type="number" min="1" max="10" value="4">
+            </div>
+            <button class="primary-button" type="submit">Ask GridMind</button>
+          </div>
+        </form>
+
+        <div class="response-block">
+          <div class="response-header">
+            <h3>Grounded answer</h3>
+            <span id="query-status" class="inline-status">Waiting for a question.</span>
+          </div>
+          <pre id="answer-output" class="answer-output">Your answer will appear here.</pre>
+        </div>
+      </section>
+
+      <aside class="panel sources-panel">
+        <div class="panel-header">
+          <h2>Retrieved sources</h2>
+          <p>The app shows which chunks were used to answer.</p>
+        </div>
+        <div id="sources-list" class="sources-list">
+          <div class="source-empty">No sources yet. Ask a question to see retrieval results.</div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

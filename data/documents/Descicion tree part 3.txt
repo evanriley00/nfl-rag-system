@@ -1,0 +1,191 @@
+﻿improve WR-yard forecasts by modeling (a) where and how a QB prefers to throw (left/middle/right; short/deep; air-yards profile) and (b) where and how a defense tends to concede throws and yards by direction and coverage. I only use pregame features by shifting every tendency to the last known game/week, then stabilizing noisy rates with rolling windows + empirical-Bayes shrinkage (k≈50). The highest uplift usually comes from “fit” features like (QB tendency − DEF allowance) × WR archetype, because they explicitly encode matchup compatibility instead of treating QB/DEF signals independently. Public coverage/pressure/time-to-throw signals are available via participation data, pass-direction fields are in play-by-play, and 2016+ weekly passing/receiving aggregates are available via Next Gen Stats loaders. 
+Variables to add
+Below I rank additions by expected uplift for player–game WR yards (2016–present, pregame only). I assume WR archetype inputs (route mix / aDOT / alignment proxies) come from your existing pipeline; if your archetype source is different, that is unspecified and you should map accordingly.
+High uplift
+* QB pass-direction rates (L/M/R) + efficiency by direction (mechanism: target availability and completion quality differ by side). Transforms: EWMA(8 games, half-life≈3) for rate; EB shrink to league mean; opponent-adjusted delta (qbL − defAllowL); interact with WR “left-role” (alignment/route mix). Availability: public via pbp pass_location (play-level). 
+* QB depth profile (short/deep rate; air_yards distribution; aDOT) (mechanism: drives yard variance; deep volume dominates “greatly exceed”). Transforms: short/deep from pass_length; air_yards mean/quantiles; delta vs defense deep allowance; interact with WR deep-route share / aDOT archetype. Availability: public pbp (pass_length, air_yards). 
+* Defense direction allowance (targets, yards/att, EPA/att by L/M/R; deep vs short allowed) (mechanism: some defenses funnel throws inside/outside or cap deep shots). Transforms: rolling allowed rates, EB shrink; “funnel” index = allowM − leagueM; interact with QB direction. Availability: public from pbp aggregates by defensive team. 
+* Coverage tendencies (man/zone; coverage shell) + pressure context (mechanism: coverage impacts route success; pressure impacts time for deeper concepts). Transforms: rolling def man rate, shell rates; pressure rate; create mismatch terms with QB time-to-throw and WR depth archetype. Availability: public/limited via participation fields defense_man_zone_type, defense_coverage_type, was_pressure, time_to_throw (play-level). 
+Medium uplift
+* QB “under pressure” adjustments (mechanism: some QBs shift direction/depth when pressured). Transforms: compute QB dir/depth conditional on was_pressure; interact with opponent pressure rate; EB shrink heavily (small n). Availability: participation. 
+* Next Gen weekly QB accuracy difficulty-adjusted metrics (e.g., CPOE proxies) (mechanism: stabilizes catchable volume, especially for deep/outside). Transforms: weekly rolling QB CPOE/catchability; interact with WR aDOT; adjust for opponent coverage/pressure. Availability: public but thresholded; 2016+ weekly via load_nextgen_stats(). 
+* Starter confirmation + QB change flags (mechanism: first starts and midweek QB changes break historical tendencies). Transforms: “new QB start” indicator; “first 2 starts” bucket. Availability: official gamebooks + schedules; pregame-only if timestamped at kickoff. 
+Low uplift (usually situational)
+* Very granular coverage-shell splits by direction (mechanism: real, but sparse). Transforms: only keep coarse buckets (MOFC vs MOFO; Cover-1/3 vs 2-high) and EB shrink aggressively. Availability: participation; may vary by season/provider. 
+Integration notes (no leakage)
+* Joins: pbp uses game_id+play_id; QB identity via passer IDs; defense via defensive team on play; weekly joins by season+week+player ID. 
+* Temporal shifting: compute all QB/DEF tendencies from games strictly before the target game (e.g., last game date < current game date; or week-1 within season).
+* Missingness: participation and NGS are not “complete for all players/plays;” store missingness flags as features (and never impute as 0). 
+Pitfalls
+* Collinearity (direction rate, depth rate, air_yards/aDOT all correlate): prefer “fit deltas” and keep base tendencies but prune redundant variants.
+* Small-sample noise (rookie QBs / new play-callers / rare shells): EB shrink and minimum-attempt thresholds.
+* Schema/provider drift across seasons for participation: keep season (and optionally provider era) as a stabilizer feature. 
+Legal/licensing concerns + proxies
+* Participation data has explicit attribution/licensing notes (NGS pre-2023; FTN from 2023+)—honor CC-BY-SA requirements and attribution tooling in your pipeline. 
+* PFF: consumer subscriptions do not include API access; enterprise access requires separate arrangements. Use only within permitted terms. 
+* “Official” real-time data feeds are commercially distributed via partners (e.g., Genius Sports; historical partnerships with Sportradar are reported). If you buy feeds, ensure redistribution rights are explicit. 
+* Practical public proxies when ideal coverage tags are unavailable: infer funnel from pbp pass_location/air_yards allowed; infer pressure from sacks/hits/quick throws; infer shell coarsely from depth + middle-field patterns (lower fidelity). 
+QB×defense interaction features
+Ranked (1→25) with terse mechanism + preprocessing hint (all computed on trailing windows; EB shrink k≈50; then optionally multiplied by WR archetype weight).
+rk
+	feature (shorthand)
+	why
+	prep hint
+	1
+	(qbL−defAL)×wrL
+	dir fit
+	EB8
+	2
+	(qbR−defAR)×wrR
+	dir fit
+	EB8
+	3
+	(qbM−defAM)×wrM
+	funnel
+	EB8
+	4
+	(qbDeep−defADeep)×wrDeep
+	boom risk
+	EB8
+	5
+	(qbADOT−defAADOT)×wrADOT
+	depth fit
+	EB8
+	6
+	(qbAYL−defAAYL)×wrL
+	yards fit
+	EB8
+	7
+	(qbAYR−defAAYR)×wrR
+	yards fit
+	EB8
+	8
+	(qbCompL−defACompL)×wrL
+	catchable
+	EB+μ
+	9
+	(qbCompD−defACompD)×wrDeep
+	deep acc
+	EB+μ
+	10
+	(qbTTT×defP)×wrDeep
+	time vs rush
+	zscore
+	11
+	(qbTTT×defP)×wrShort
+	hot reads
+	zscore
+	12
+	(qbScrRate×defP)
+	scramble
+	EB8
+	13
+	(qbManEPA−defManEPA)
+	man fit
+	EB8
+	14
+	(qbZoneEPA−defZoneEPA)
+	zone fit
+	EB8
+	15
+	(qbMan%−defMan%)×wrSep
+	cover fit
+	EB8
+	16
+	(qbC1EPA−defC1EPA)×wrIso
+	C1 iso
+	EB8
+	17
+	(qbC3EPA−defC3EPA)×wrCross
+	C3 seams
+	EB8
+	18
+	(qb2HighRate−def2HighRate)×wrDeep
+	cap deep
+	EB8
+	19
+	(qbMiddleTarget−defMidAllow)×wrM
+	MOFC
+	EB8
+	20
+	(qbOutsideTarget−defOutAllow)×wrOut
+	boundary
+	EB8
+	21
+	(qbRZDeep−defRZDeepA)×wrRZ
+	TD-driven
+	EB8
+	22
+	(qb1stDownPass%−def1stDownAllow)
+	script
+	EB8
+	23
+	(qbNoHuddle%−defNoHuddleA)
+	pace
+	EB8
+	24
+	(qbMotionPass%−defMotionA)×wrMotion
+	leverage
+	EB8
+	25
+	(qbExplosive%−defExplosiveA)×wrDeep
+	ceiling
+	EB8
+	Legend (minimal): qbL/M/R = QB pass-location rates; defA* = defense allowed counterpart; P=pressure rate; C1/C3/2High/Man/Zone from participation coverage labels. 
+Feature-engineering recipes
+Below are 12 “drop-in” recipes I use (SQL-ish pseudocode). I treat k=50 as the EB prior sample size; tune by minimizing validation MAE.
+sql
+Copy
+-- helpers
+EB(rate,n,mu,k=50) = (rate*n + mu*k)/(n+k)
+EWMA(x,halflife=3,last8games)  -- compute on prior games only
+
+
+1 qbL = EB(EWMA(att_L/att_all), n_att, leagueL)
+2 defAL = EB(EWMA(allowAtt_L/allowAtt_all), n_allowAtt, leagueL)
+3 fitL_WR = (qbL - defAL) * WR_left_role   -- archetype weight
+
+
+4 qbDeep = EB(EWMA(att_deep/att_pass), n_att, leagueDeep)
+5 defADeep = EB(EWMA(allow_deep/allow_pass), n_allow, leagueDeep)
+6 fitDeep_WR = (qbDeep - defADeep) * WR_deep_role
+
+
+7 qbADOT = EB(EWMA(avg(air_yards)), n_targets, leagueADOT)
+8 defAADOT = EB(EWMA(avg_allow_air_yards)), n_allowTargets, leagueADOT)
+9 fitADOT_WR = (qbADOT - defAADOT) * WR_aDOT
+
+
+10 defP = EB(EWMA(pressure_plays/dropbacks), n_dropbacks, leagueP)
+11 qbTTT = EB(EWMA(avg(time_to_throw)), n_dropbacks, leagueTTT)
+12 rushMismatch = z(qbTTT) * z(defP) * WR_deep_role
+
+
+Data sources for pass_location/pass_length/air_yards (pbp) and time_to_throw/was_pressure/coverage (participation) are documented in the nflverse ecosystem. 
+Validation experiments and metrics
+I validate uplift with time-aware backtesting (rolling-origin or “train on seasons ≤Y, test on Y+1”), then report medians across folds. I run ablations: baseline → +QB-only → +DEF-only → +QB×DEF fit terms → +WR-weighted fit terms, using MAE/RMSE for yards and macro-F1 (or balanced accuracy) for exceed/meet/fall-below classes. I expect small but real average gains from QB/DEF fit (often “medium” effect), but the biggest value is usually fewer catastrophic misses for deep WR archetypes and in games with extreme funnels/pressure. For subgroup tests I isolate: rookie QBs (first 6–8 starts), “first start with new team,” man-heavy vs zone-heavy defenses, and deep-aDOT WRs; I aim for ≥2k–5k WR-games per subgroup to reduce noise, otherwise I widen EB priors and treat results as directional. 
+Production integration checklist
+* ID crosswalks: normalize QB/WR IDs across pbp, participation, NGS weekly, gamebooks (store canonical player IDs; keep name-cleaning logs). 
+* Timestamping: store feature snapshots “as-of kickoff” and block any post-kick updates; persist raw extracts for replay.
+* Strict shifting: enforce feature_game_date < target_game_date (or week-1) and unit-test it.
+* Missingness flags: separate “true zero” from “not recorded” (NGS thresholds; participation provider gaps). 
+* Retrain cadence: weekly incremental update + quarterly re-tuning of k and window sizes; re-calibrate classification thresholds each season.
+* Drift monitoring: track distribution shifts in coverage labels, pressure rates, and QB direction rates; alert on changes by season/provider. 
+Data acquisition list
+* nflreadr pbp (free; low effort): pass direction (pass_location), depth (pass_length), air_yards for QB/DEF direction/depth tendencies (play-level). 
+* nflreadr participation (free; medium effort): route, defense_man_zone_type, defense_coverage_type, time_to_throw, was_pressure (play-level); mind licensing/attribution notes. 
+* Next Gen Stats weekly via nflreadr (free; low effort): QB passing/WR receiving weekly stats (2016+; thresholded); use for stabilized QB accuracy/difficulty proxies. 
+* Official gamebooks (free; medium effort): starter/inactive confirmation and metadata (game-level PDFs). 
+* PFF coverage/matchup data (paid; medium–high effort): richer man/zone matchup and separation context (2019+ coverage dataset); enterprise access for API-like pulls. 
+* Official data distributors (high cost; high effort): real-time official data/odds ecosystems via Genius/Sportradar partnerships (contract-dependent). 
+QB/defense feature-join flow
+pbp plays: pass_location/pass_length/air_yards
+QB rolling + EB
+DEF allow rolling + EB
+participation: coverage/pressure/TTT
+NGS weekly passing
+WR archetype: route mix/aDOT/align
+QB×DEF fit × WR weights
+player-game table
+model train: time-aware CV
+pregame scoring

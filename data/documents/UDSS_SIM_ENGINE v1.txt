@@ -1,0 +1,315 @@
+﻿Purpose
+ Run a fast Monte-Carlo using the already-filled UDSS JSON, then write results back to sim so UDSS scoring can use them.
+Run Order (no exceptions)
+1) Hydrate JSON from live sources
+2) Apply scheme constraints (QB Rush / Primary Receiver)
+3) run_sim_and_write_back(obj)   ← THIS SHEET
+4) Score UDSS (A/B/C1/C2/D + E), apply Pattern Edge, Gating & Unit Sizing
+
+
+Output Contract (for your final human message)
+ Always include a Sim line:
+Sim: <hit_prob as % or 'not executed'> (p10/p50/p90 or reason; 'degraded' if defaults used)
+
+
+________________
+
+
+1) Inputs (pulled from UDSS JSON)
+Header/Market
+* header.prop, header.line
+
+Usage & Efficiency
+   * usage_efficiency.routes_gm.{season,l5}
+
+   * usage_efficiency.shares.{target_pct,rush_share,air_yard_share}
+
+   * usage_efficiency.eff.{yprr,adot,yac_rec,ypc,epa_play}
+
+   * usage_efficiency.snaps_gm.{season,l5}
+
+Availability/Role
+      * availability_role.snap_share_last3 (proxy for stability)
+
+Opponent Modules
+         * pass: pressure_pct, blitz_pct, p2s_pct, man_zone.{man,zone}, int_rate, spy_rate_est, bracket_prob_primary
+
+         * receive: pressure_rate, double_bracket_prob, scheme.{man_pct,zone_pct}
+
+         * rush: epa_rush, success_pct, stuff_pct, stacked_box_pct
+
+Trenches
+            * pbwr, rbwr, ol_continuity_index, t2t_allowance_delta_ms
+
+Constraints
+               * qb_rush_constraint, primary_receive_constraint
+
+Environment
+                  * spread, total, weather.wind
+
+Required per prop (if missing → degraded mode, not skip)
+                     * Receiving: routes_gm, target_pct (or role share), aDOT, YAC/rec, pressure_rate, double_bracket_prob, t2t_allowance_delta_ms
+
+                     * QB Rushing: dropbacks estimate, base scramble rate, spy_rate_est, man/zone, contain proxy (ΔT2T / OL continuity), designed runs
+
+                     * QB Passing: neutral pass rate/script, completion baseline, aDOT/YAC, pressure_rate, man/zone, ΔT2T
+
+________________
+
+
+2) Degraded Mode (use when critical inputs are missing)
+If any of these are null for the current prop:
+spy_rate_est, double_bracket_prob, ol_continuity_index, man_zone, pressure_rate (or pressure_pct), t2t_allowance_delta_ms
+→ Do NOT bail. Run with conservative defaults and flag degraded mode.
+Defaults
+                        * spy_rate_est = 0.08
+
+                        * double_bracket_prob = 0.20
+
+                        * ol_continuity_index = 3
+
+                        * man_zone = {"man": 0.45, "zone": 0.55}
+
+                        * pressure_rate = 0.30 (or use pressure_pct if present)
+
+                        * t2t_allowance_delta_ms = -60
+
+Record
+                           * sim.debug.mode = "degraded"
+
+                           * sim.debug.missing = ["..."]
+
+Risk rule
+                              * Add +1 to D (Environment & Market) automatically when degraded mode runs.
+
+Hard skips (truly fatal)
+                                 * header.prop or header.line missing → set sim = {"runs":0,"hit_prob":null,"reason":"fatal: missing prop/line"} and do not adjust D.
+
+________________
+
+
+3) Parameter Mapping (lightweight, fast)
+A) Receiving Yards (WR/TE/RB)
+Targets
+                                    * μ_targets = routes_gm.l5 * team_TPR * role_share * adj_bracket * adj_t2t
+
+                                       * team_TPR: team target per route (default 0.20 if unknown)
+
+                                       * role_share: use shares.target_pct or role proxy; default 0.18
+
+                                       * adj_bracket = 1 - clamp(double_bracket_prob, 0, 0.50) (e.g., 0.35 → 0.65)
+
+                                       * adj_t2t = 1 - clamp(|min(0, t2t_ms)| / 160, 0, 0.25) (−80ms ⇒ 0.5)
+
+                                          * Targets per trial: T ~ Poisson(μ_targets)
+
+Catch %
+                                             * p = base_catch * adj_pressure * adj_coverage
+
+                                                * base_catch from player baseline (use 0.62 default if unknown)
+
+                                                * adj_pressure = 1 - clamp((pressure_rate - 0.30), 0, 0.15)
+
+                                                * adj_coverage = 0.85 if man_pct > zone_pct and primary shadow risk; else 1.0
+
+                                                   * Catches per trial: C ~ Binomial(T, p)
+
+Yards per catch
+                                                      * μ_yc = max(0, 0.7*adot + 0.3*yac_rec) * (1 - clamp(|min(0,t2t_ms)|/120, 0, 0.25))
+
+                                                      * σ_yc = clamp(0.6*μ_yc, 3, 20)
+
+                                                      * For each catch: YPC ~ Normal(μ_yc, σ_yc), floor at 0
+
+                                                      * Total yards = sum of sampled YPC over C
+
+B) QB Rush Yards
+Designed carries
+                                                         * D ~ Poisson(μ_designed); from usage or default 1.2 if unknown
+
+Scrambles
+                                                            * S ~ Poisson(DB * scramble_rate * adj_spy * adj_zone * adj_contain)
+
+                                                               * DB ≈ neutral dropbacks (team pass attempts + sacks est.; default 32)
+
+                                                               * scramble_rate baseline (default 0.08 if unknown)
+
+                                                               * adj_spy = 1 - clamp(spy_rate_est, 0, 0.35)
+
+                                                               * adj_zone = 1 - clamp((zone - 0.55), 0, 0.20)
+
+                                                               * adj_contain = 1 - clamp((10 - contain_rank)/20, 0, 0.25) (if you don’t track rank, set 0.9 when ol_continuity_index ≤ 3 else 1.0)
+
+                                                               * If qb_rush_constraint = true, multiply scrambles by 0.65
+
+Yards per attempt
+                                                                  * μ_ypa = 6.5 * adj_contain (typical 5.5–6.5), σ_ypa = 0.6*μ_ypa
+
+                                                                  * YPA ~ Normal(μ_ypa, σ_ypa) floored at 0
+
+                                                                  * Total yards = (D + S) × sampled YPA
+
+C) QB Passing Yards
+Attempts
+                                                                     * μ_att = base_att * script_adj
+
+                                                                        * base_att from team neutral pass rate × pace × snaps (default 31)
+
+                                                                        * script_adj: +10% if slight dog (−3 to +7), +20% if dog >3; −10% if favored >7
+
+                                                                           * Att ~ Normal(μ_att, 6) clamp ≥ 10
+
+Completion %
+                                                                              * cmp = base_cmp * cov_adj * pressure_adj
+
+                                                                                 * base_cmp from player (default 0.64)
+
+                                                                                 * cov_adj = 0.95 if man_pct > zone_pct else 1.00
+
+                                                                                 * pressure_adj = 1 - clamp((pressure_rate - 0.30), 0, 0.15) (clip 0.85–1.00)
+
+Yards per completion
+                                                                                    * μ_yc = max(5.5, 7.2 + 0.015*(adot*100) + 0.02*(yac_rec*100)) * t2t_adj
+
+                                                                                       * t2t_adj = 1 - clamp(|min(0, t2t_ms)|/160, 0, 0.25)
+
+                                                                                          * σ_yc = clamp(0.4*μ_yc, 1.5, 5.0)
+
+                                                                                          * Yards = round(Att * cmp) * Normal(μ_yc, σ_yc) floored at 0
+
+________________
+
+
+4) Monte-Carlo Routine
+                                                                                             * Trials: N = 10000 (use 2000 if constrained)
+
+                                                                                             * For each trial: simulate yards for the specific prop → compare to header.line
+
+                                                                                             * Collect distribution for percentiles
+
+Write-Back (always overwrite sim)
+"sim": {
+  "runs": N,
+  "hit_prob": <hits / N>,
+  "p10": <percentile 10>,
+  "p50": <percentile 50>,
+  "p90": <percentile 90>,
+  "debug": {
+    "mode": "normal|degraded",
+    "missing": ["..."],          // only if degraded
+    "mu_targets": ...,           // when receiving
+    "catch_p": ...,
+    "mu_yc": ...,
+    "DB": ...,                   // when QB passing/rushing
+    "scramble_rate_eff": ...     // after adj
+  }
+}
+
+
+________________
+
+
+5) Risk Integration (unchanged thresholds)
+                                                                                                * If Over and hit_prob < 0.46 → +1 to D (Env & Market)
+
+                                                                                                * If Over and hit_prob < 0.42 → +2 to D
+
+                                                                                                * Mirror for Under: > 0.54 → +1; > 0.58 → +2
+
+                                                                                                * If degraded mode ran → +1 to D (in addition to above, not instead)
+
+________________
+
+
+6) Fallbacks & Guards
+                                                                                                   * Fatal only: missing header.prop or header.line → sim.runs=0, hit_prob=null, reason = fatal
+
+                                                                                                   * Negative yards → clip to 0
+
+                                                                                                   * Absurd outlier: if any single play > p90*3, resample that draw
+
+                                                                                                   * Unknowns: add missing keys to unknown_fields
+
+________________
+
+
+7) Pseudocode (drop-in)
+function run_sim_and_write_back(obj):
+  if !obj.header.prop or obj.header.line is null:
+      obj.sim = {"runs":0,"hit_prob":null,"reason":"fatal: missing prop/line"}
+      return obj
+
+
+  # detect degraded mode
+  missing = []
+  need = []
+  if prop in ["Receiving Yards","Receptions"]:
+      need = ["usage_efficiency.routes_gm.l5","usage_efficiency.eff.adot",
+              "usage_efficiency.eff.yac_rec","opponent_modules.receive.pressure_rate",
+              "opponent_modules.receive.double_bracket_prob","trenches.t2t_allowance_delta_ms"]
+  elif prop == "QB Rushing Yards":
+      need = ["opponent_modules.pass.spy_rate_est","opponent_modules.pass.man_zone.zone",
+              "trenches.ol_continuity_index","trenches.t2t_allowance_delta_ms"]
+  elif prop in ["Passing Yards","QB Passing Yards"]:
+      need = ["opponent_modules.pass.man_zone.zone","opponent_modules.pass.pressure_pct",
+              "trenches.t2t_allowance_delta_ms"]
+
+
+  for key in need:
+      if value_is_null(obj, key): missing.append(key)
+
+
+  degraded = (len(missing) > 0)
+  if degraded:
+      apply_defaults(obj)    # set the conservative defaults listed above
+
+
+  N = 10000
+  hits = 0
+  samples = []
+
+
+  for i in 1..N:
+      yards = 0
+      if prop in ["Receiving Yards","Receptions"]:
+          T  = poisson(mu_targets(obj))
+          p  = clamp(catch_rate(obj), 0.35, 0.85)
+          C  = binomial(T, p)
+          mu, sd = yc_params(obj)
+          for j in 1..C: yards += max(0, normal(mu, sd))
+      elif prop == "QB Rushing Yards":
+          D  = poisson(mu_designed(obj))
+          S  = poisson(mu_scramble(obj))   # includes spy/zone/contain adjustments
+          mu, sd = qb_ypa_params(obj)
+          for j in 1..(D+S): yards += max(0, normal(mu, sd))
+      elif prop in ["Passing Yards","QB Passing Yards"]:
+          Att = max(10, normal(mu_att(obj), 6))
+          cmp = clamp(comp_rate(obj), 0.50, 0.72)
+          mu, sd = pass_yards_per_comp_params(obj)
+          yards = max(0, round(Att * cmp) * normal(mu, sd))
+      samples.append(yards)
+      if yards >= obj.header.line: hits += 1
+
+
+  obj.sim = {
+      "runs": N,
+      "hit_prob": hits/N,
+      "p10": percentile(samples,10),
+      "p50": percentile(samples,50),
+      "p90": percentile(samples,90),
+      "debug": {}
+  }
+  if degraded:
+      obj.sim.debug.mode = "degraded"
+      obj.sim.debug.missing = missing
+
+
+  return obj
+
+
+________________
+
+
+8) Prompt Hook (one line)
+After constraints and before scoring, call: obj = run_sim_and_write_back(obj)
+In the final human message, always print: Sim: <value or 'not executed'> (…details…).

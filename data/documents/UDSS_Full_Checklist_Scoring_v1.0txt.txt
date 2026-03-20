@@ -1,0 +1,330 @@
+﻿Final Risk Score = Sum of All Risk Factors
+
+
+Total UDSS Score        Final Rating
+0 - 2 points        ✅ SAFE
+3 - 5 points        ⚠️ RISKY
+6+ points OR any critical override        ❌ DANGEROUS
+
+
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2 pts)
+	
+
+Season Average vs. Prop Line
+	Avg above or equal to prop line
+	Avg is below prop line by 0.5 to 2 points
+	Avg is below prop line by 2.5+ points
+	
+
+Last 5 Games vs. Prop Line
+	Avg above or equal to prop line
+	Avg is below prop line by 0.5 to 2 points
+	Avg is below prop line by 2.5+ points
+	
+
+Shooting % (FG%, 3PT%)
+	Within 1% of season average
+	2-5% drop in shooting
+	6%+ drop in FG% or 3PT%
+	
+
+Three-Point Attempt Rate
+	Attempt rate stable or increasing
+	Attempt rate down 10-20%
+	Attempt rate down 20%+
+	
+
+Free Throw Dependency
+	FT% and attempts unchanged
+	FT% down by 5% OR attempts down by 20%
+	FT% down by 10%+ AND attempts down by 30%+
+	
+
+Usage Rate
+	Usage unchanged or increasing
+	Usage rate down 2-5%
+	Usage rate down 6%+
+	
+
+Turnover Rate
+	Turnovers unchanged or improving
+	Turnovers up 10-20%
+	Turnovers up 20%+
+
+
+
+
+
+
+
+
+
+
+	
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	
+
+Injury Report
+	No reported injury
+	Game-time decision (GTD), day-to-day
+	Confirmed injury, missed last game
+	
+
+Minutes Restriction
+	Full minutes
+	Limited to 75-90% of normal minutes
+	Limited below 75% of normal minutes
+	
+
+Rest Days / Load Management
+	Normal rest
+	Missed last practice
+	Confirmed rest plan from coach
+	
+
+Back-to-Back Fatigue
+	No back-to-back
+	Played 35+ mins in last game
+	Played 40+ mins in last game
+	
+
+Travel Fatigue
+	No major travel
+	Cross-country travel game
+	3rd game in 4 nights / long road trip
+	
+
+
+
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	Opponent Defensive Rating
+	Outside Top 10
+	Ranked 6-10 in DRtg
+	Top 5 defense in DRtg
+	Opponent Position-Specific Defense
+	Opponent allows league average or worse vs. position
+	Opponent allows Top 10 defense vs. position
+	Opponent Top 3 defense vs. position
+	Primary Defender Strength
+	Average or weak defender
+	Top 20 individual defender
+	Top 10 defender (e.g., Jrue Holiday, Wiggins, Gobert, Draymond, etc.)
+	Double-Team Frequency
+	Double-teamed <15% of plays
+	15-30% double-team frequency
+	30%+ double-team frequency
+	Opponent Rim Protection
+	Opponent allows league average FG% at rim
+	Opponent allows 5%+ lower FG% at rim
+	Elite rim protector matchup (e.g., Gobert, Embiid, Jaren Jackson Jr.)
+	________________
+
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	Sharp Money Indicator
+	Sharp money neutral or on over
+	Minor fade (-0.5 to -1 point movement)
+	Heavy sharp money fade (-1.5 or more movement)
+	Reverse Line Movement (RLM)
+	No RLM detected
+	Line moves against betting % by small amount
+	Line moves against public by a major amount
+	Public Betting %
+	Betting is evenly distributed
+	70%+ bets on one side
+	80%+ bets on one side & line moves opposite
+	Juice Analysis (-Odds Pricing)
+	Juice -110 to -120 (normal)
+	Juice -125 to -140 (riskier)
+	Juice -145 or worse (overvalued line)
+	
+
+________________
+
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	Team Pace
+	Team playing at normal pace
+	Team playing slower pace than usual
+	Extreme slowdown (bottom 5 pace game)
+	Assist Distribution
+	No major changes
+	Other playmakers taking more assists
+	Assist role significantly reduced
+	Rebounding Opportunities
+	Normal rebounding chances
+	Opponent allows few rebounds
+	Team plays small lineup, reducing rebounds
+	Garbage Time Probability
+	Game expected to be close
+	Game spread 10+ points
+	Game spread 15+ points (blowout risk)
+	________________
+
+
+Check
+	✅ Pass (0 pts)
+	❌ Major Issue (+3 pts)
+	User-Defined Blacklist
+	Player allowed
+	Player blacklisted
+	User Confidence Threshold
+	Pick meets confidence %
+	Below confidence %
+	User Veto Override
+	No veto
+	Veto applied → Auto-Block
+	
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	First-Quarter Scoring Rate
+	Normal first-quarter production
+	First-quarter production down 10%
+	First-quarter production down 20%+
+	Second-Half Usage Rate
+	Usage consistent across halves
+	Usage drops 10-20% in 2nd half
+	Usage drops 20%+ in 2nd half
+	Crunch Time Performance
+	Maintains or improves late-game scoring
+	10-20% scoring drop in clutch
+	20%+ drop in clutch scoring
+	Fourth-Quarter Usage Rate
+	Normal fourth-quarter usage
+	Fourth-quarter usage down 10-20%
+	Fourth-quarter usage down 20%+
+	________________
+
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	Game-Time Decision Check
+	Not listed as GTD
+	GTD but expected to play
+	GTD with uncertainty or coach unclear
+	Post-Injury Performance Check
+	Performance at normal levels
+	Performance down 10-15% post-injury
+	Performance down 15%+ post-injury
+	Injury Recurrence Risk
+	No previous injury issues
+	Recent history of similar injuries
+	Player has recurring injury history (e.g., Kawhi, AD, Embiid, etc.)
+	Rehabilitation Minutes Ramp-Up
+	No impact
+	Limited to 75-90% minutes
+	Limited below 75% minutes
+	Coach Interview Check
+	Coach confirms normal workload
+	Coach suggests reduced workload
+	Coach says minutes will be “managed”
+	
+
+________________
+
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	Pick-and-Roll Defense
+	Opponent struggles vs P&R
+	Opponent is average vs. P&R
+	Opponent is elite vs. P&R
+	Isolation Defense Check
+	Opponent struggles in ISO
+	Opponent allows league average ISO FG%
+	Opponent is elite ISO defender
+	Opponent Shot Contest Frequency
+	Opponent contests shots at average rate
+	Opponent contests shots aggressively
+	Opponent top 5 in contest rate
+	Double-Team Frequency
+	Opponent rarely double-teams
+	Double-teams player 15-30% of plays
+	Double-teams 30%+ of plays
+	________________
+
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	Handle Percentage Check
+	Handle percentage spread evenly
+	One side has 70%+ of the handle
+	One side has 85%+ of the handle
+	Market Consensus Check
+	Odds consistent across sportsbooks
+	Slight variation across books
+	One sportsbook has a significantly different line
+	Closing Line Value Check (CLV)
+	CLV stable or positive
+	CLV dropped by -0.5 to -1.0
+	CLV dropped by -1.5 or worse
+	
+
+________________
+
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	Garbage Time Probability
+	Game spread <8 points
+	Game spread 8-14 points
+	Game spread 15+ points (blowout risk)
+	Opponent Offensive Rebound Allowed Rate
+	Opponent allows league average OREB%
+	Opponent allows Top 10 lowest OREB%
+	Opponent allows Top 5 lowest OREB%
+	Team Turnover Rate
+	Team turnover rate unchanged
+	Team turnover rate up 10-20%
+	Team turnover rate up 20%+
+	________________
+
+
+Check
+	✅ Pass (0 pts)
+	❌ Major Issue (+3 pts)
+	User-Defined Sportsbook Priority
+	Line available on preferred sportsbook
+	Line not available on preferred sportsbook
+	User-Uploaded File Rule Check
+	No conflicts with user’s file
+	Conflict detected (e.g., auto-fade rule)
+	
+
+Check
+	✅ Pass (0 pts)
+	⚠️ Moderate Issue (+1 pt)
+	❌ Major Issue (+2-3 pts)
+	Player Recently Traded
+	Rolling 5-game average within ±10% of pre-trade stats (PPG, AST, REB, USG%)
+	Rolling 5-game average fluctuating by 10-15%
+	Rolling 5-game average fluctuating by 15%+ OR constant fluctuations all season
