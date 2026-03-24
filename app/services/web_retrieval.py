@@ -9,6 +9,7 @@ from urllib import error, parse, request
 
 USER_AGENT = "Mozilla/5.0 (compatible; GridMind/1.0; +https://gridmind.local)"
 RESULT_LINK_PATTERN = re.compile(r'<a rel="nofollow" class="result__a" href="(?P<href>.*?)">(?P<title>.*?)</a>')
+RESULT_SNIPPET_PATTERN = re.compile(r'<a class="result__snippet" href=".*?">(?P<snippet>.*?)</a>')
 TAG_PATTERN = re.compile(r"<[^>]+>")
 WHITESPACE_PATTERN = re.compile(r"\s+")
 
@@ -67,7 +68,7 @@ def _fetch_text(url: str) -> str:
     return WHITESPACE_PATTERN.sub(" ", parser.text()).strip()
 
 
-def _search_duckduckgo(query: str, max_results: int) -> list[tuple[str, str]]:
+def _search_duckduckgo(query: str, max_results: int) -> list[tuple[str, str, str]]:
     search_url = "https://html.duckduckgo.com/html/?" + parse.urlencode({"q": query})
     req = request.Request(search_url, headers={"User-Agent": USER_AGENT})
     try:
@@ -77,10 +78,15 @@ def _search_duckduckgo(query: str, max_results: int) -> list[tuple[str, str]]:
         raise ValueError(f"Web search failed: {exc.reason}") from exc
 
     matches = []
-    for match in RESULT_LINK_PATTERN.finditer(raw):
+    link_matches = list(RESULT_LINK_PATTERN.finditer(raw))
+    for index, match in enumerate(link_matches):
         href = _normalize_result_url(html.unescape(match.group("href")))
         title = _clean_html_text(match.group("title"))
-        matches.append((title or "Web Result", href))
+        next_start = link_matches[index + 1].start() if index + 1 < len(link_matches) else len(raw)
+        snippet_window = raw[match.end():next_start]
+        snippet_match = RESULT_SNIPPET_PATTERN.search(snippet_window)
+        snippet = _clean_html_text(snippet_match.group("snippet")) if snippet_match else ""
+        matches.append((title or "Web Result", href, snippet))
         if len(matches) >= max_results:
             break
     return matches
@@ -90,20 +96,26 @@ def web_search_chunks(question: str, *, max_results: int = 3) -> list[WebChunk]:
     query = f"{question} NFL"
     results = _search_duckduckgo(query, max_results=max_results)
     chunks: list[WebChunk] = []
-    for index, (title, url) in enumerate(results):
+    for index, (title, url, snippet) in enumerate(results):
+        combined_parts: list[str] = []
+        if snippet:
+            combined_parts.append(snippet)
         try:
-            text = _fetch_text(url)
+            page_text = _fetch_text(url)
         except Exception:
+            page_text = ""
+        if page_text:
+            combined_parts.append(page_text)
+        if not combined_parts:
             continue
-        if not text:
-            continue
-        snippet = text[:1800]
+        text = " ".join(combined_parts)
+        snippet_text = text[:1800]
         chunks.append(
             WebChunk(
                 document_id=f"web-{index}",
                 title=title,
                 chunk_id=f"web-chunk-{index}",
-                text=snippet,
+                text=snippet_text,
                 url=url,
             )
         )

@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import json
 import mimetypes
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from urllib.parse import unquote
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from uuid import uuid4
 
 from app.config import settings
-from app.models import QueryResponse, SourceChunk
+from app.models import AnswerCard, QueryResponse, SourceChunk
 from app.services.document_store import (
     build_chunks,
     load_documents,
@@ -29,6 +32,36 @@ class AppState:
 
 state = AppState()
 STATIC_DIR = Path(__file__).parent / "static"
+PROJECTION_MARKERS = (
+    "projection",
+    "project",
+    "yards",
+    "touchdowns",
+    "td",
+    "prop",
+    "line",
+    "odds",
+    "expect",
+    "forecast",
+    "higher",
+    "lower",
+    "over",
+    "under",
+)
+DEFENSE_MATCHUP_MARKERS = (
+    "against",
+    "vs",
+    "versus",
+    "defense",
+    "secondary",
+    "coverage",
+)
+
+
+@dataclass(slots=True)
+class GeneratedAnswer:
+    text: str
+    card: AnswerCard | None = None
 
 
 def embedding_client() -> OpenAIEmbeddingClient | None:
@@ -50,16 +83,127 @@ def responses_client() -> OpenAIResponsesClient | None:
     )
 
 
+def is_projection_question(question: str) -> bool:
+    lowered_question = question.lower()
+    return any(marker in lowered_question for marker in PROJECTION_MARKERS)
+
+
+def is_defense_projection_question(question: str) -> bool:
+    lowered_question = question.lower()
+    return is_projection_question(question) and any(
+        marker in lowered_question for marker in DEFENSE_MATCHUP_MARKERS
+    )
+
+
+def fetch_udss_context(
+    *,
+    index: RetrievalIndex,
+    question: str,
+    client: OpenAIEmbeddingClient | None,
+) -> list[tuple[object, float]]:
+    supplemental_queries = [
+        f"UDSS {question}",
+        "UDSS NFL player prop checklist defense vs prop type market steam matchup fit",
+        "UDSS receive module defense vs position pressure bracket market higher lower",
+    ]
+    matches: list[tuple[object, float]] = []
+    seen_chunk_ids: set[str] = set()
+    for query in supplemental_queries:
+        if index.provider == "openai":
+            if client is None:
+                continue
+            query_results = index.search(query, top_k=3, embedding_client=client)
+        else:
+            query_results = index.search(query, top_k=3)
+        for chunk, score in query_results:
+            title = getattr(chunk, "title", "").lower()
+            chunk_id = getattr(chunk, "chunk_id", "")
+            if "udss" not in title:
+                continue
+            if chunk_id in seen_chunk_ids:
+                continue
+            seen_chunk_ids.add(chunk_id)
+            matches.append((chunk, score))
+            if len(matches) >= 3:
+                return matches
+    return matches
+
+
+def merge_results(
+    *,
+    primary_results: list[tuple[object, float]],
+    extra_results: list[tuple[object, float]],
+    top_k: int,
+) -> list[tuple[object, float]]:
+    merged: list[tuple[object, float]] = []
+    seen_chunk_ids: set[str] = set()
+    for chunk, score in sorted(primary_results + extra_results, key=lambda item: item[1], reverse=True):
+        chunk_id = getattr(chunk, "chunk_id", "")
+        if chunk_id and chunk_id in seen_chunk_ids:
+            continue
+        if chunk_id:
+            seen_chunk_ids.add(chunk_id)
+        merged.append((chunk, score))
+        if len(merged) >= top_k:
+            break
+    return merged
+
+
+def parse_answer_card_from_text(
+    *,
+    question: str,
+    answer_text: str,
+    defense_projection_question: bool,
+) -> AnswerCard | None:
+    if not defense_projection_question:
+        return AnswerCard(mode="standard", summary=answer_text.strip())
+
+    client = responses_client()
+    if client is None:
+        return None
+
+    instructions = (
+        "Convert the analyst answer into strict JSON with keys: "
+        "mode, summary, lean, projection_range, confidence, case_for_more, case_for_less, final_call, final_reason. "
+        "mode must be 'udss_projection'. "
+        "case_for_more and case_for_less must be arrays of short strings. "
+        "Do not invent facts beyond the answer text."
+    )
+    user_input = f"Question:\n{question}\n\nAnswer:\n{answer_text}"
+    try:
+        payload = client.generate_json(instructions=instructions, user_input=user_input)
+    except ValueError:
+        return None
+
+    case_for_more = payload.get("case_for_more", [])
+    case_for_less = payload.get("case_for_less", [])
+    if not isinstance(case_for_more, list):
+        case_for_more = []
+    if not isinstance(case_for_less, list):
+        case_for_less = []
+    return AnswerCard(
+        mode=str(payload.get("mode", "udss_projection")).strip() or "udss_projection",
+        summary=str(payload.get("summary", "")).strip(),
+        lean=str(payload.get("lean", "")).strip(),
+        projection_range=str(payload.get("projection_range", "")).strip(),
+        confidence=str(payload.get("confidence", "")).strip(),
+        case_for_more=[str(item).strip() for item in case_for_more if str(item).strip()],
+        case_for_less=[str(item).strip() for item in case_for_less if str(item).strip()],
+        final_call=str(payload.get("final_call", "")).strip(),
+        final_reason=str(payload.get("final_reason", "")).strip(),
+    )
+
+
 def generate_grounded_answer(
     *,
     question: str,
     results: list[tuple[object, float]],
     retrieval_mode: str,
-) -> str:
+) -> GeneratedAnswer:
     fallback_answer = build_answer(question, results, retrieval_mode=retrieval_mode)
     client = responses_client()
     if client is None or not results:
-        return fallback_answer
+        return GeneratedAnswer(text=fallback_answer)
 
     context_blocks = []
     for index, (chunk, score) in enumerate(results[:4], start=1):
@@ -71,25 +215,46 @@ def generate_grounded_answer(
             f"[Source {index}] {source_meta}\n{chunk.text}"
         )
 
+    projection_question = is_projection_question(question)
+    defense_projection_question = is_defense_projection_question(question)
+
     instructions = (
         "You are GridMind, an NFL analysis assistant. "
         "Answer only from the provided retrieved context. "
-        "If the context is insufficient, say so clearly. "
         "Be concise, specific, and practical. "
-        "When you use evidence, mention the source titles inline."
+        "When you use evidence, mention the source titles inline. "
+        "If the user asks for a projection, expectation, lean, or prop-style estimate, "
+        "you may synthesize a cautious estimate from the retrieved evidence instead of refusing "
+        "just because no source gives an explicit forecast. "
+        "In projection answers, explain the reasoning from recent production, role, matchup, "
+        "and injury/news context when available, and give a modest range or lean rather than false precision. "
+        "If the question is a player projection against a defense, treat the UDSS documents as required guardrails "
+        "when they are present in the retrieved context. Use the UDSS framing to evaluate matchup fit, defense vs prop type, "
+        "pressure/coverage or scheme collision, and market steam/news. Also use the web sources to argue the case for higher or lower. "
+        "For those defense-vs-player projection questions, the answer should explicitly state a lean of Higher, Lower, or Pass, "
+        "plus a short reason for each side before the final lean. "
+        "Only say the context is insufficient when the retrieved evidence does not support even a cautious estimate."
     )
     user_input = (
         f"Question:\n{question}\n\n"
         f"Retrieval mode: {retrieval_mode}\n\n"
+        f"Projection-style question: {'yes' if projection_question else 'no'}\n"
+        f"Defense-vs-player projection question: {'yes' if defense_projection_question else 'no'}\n\n"
         "Retrieved context:\n"
         + "\n\n".join(context_blocks)
     )
 
     try:
         result = client.generate_text(instructions=instructions, user_input=user_input)
-        return result.text
+        answer_text = result.text
+        answer_card = parse_answer_card_from_text(
+            question=question,
+            answer_text=answer_text,
+            defense_projection_question=defense_projection_question,
+        )
+        return GeneratedAnswer(text=answer_text, card=answer_card)
     except ValueError:
-        return fallback_answer
+        return GeneratedAnswer(text=fallback_answer)
 
 
 def should_add_web_results(question: str, results: list[tuple[object, float]], top_k: int) -> bool:
@@ -127,6 +292,10 @@ def manifest_path() -> Path:
     return settings.index_dir / "documents_manifest.json"
 
 
+def query_log_path() -> Path:
+    return settings.index_dir / "query_log.jsonl"
+
+
 def bootstrap_directories() -> None:
     settings.docs_dir.mkdir(parents=True, exist_ok=True)
     settings.index_dir.mkdir(parents=True, exist_ok=True)
@@ -136,6 +305,30 @@ def bootstrap_directories() -> None:
             persist_dir=settings.index_dir,
             collection_name=settings.chroma_collection_name,
         )
+
+
+def append_query_log(
+    *,
+    query_id: str,
+    question: str,
+    retrieval_mode: str,
+    answer: str,
+    answer_card: AnswerCard | None,
+    sources: list[SourceChunk],
+) -> None:
+    payload = {
+        "query_id": query_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "question": question,
+        "retrieval_mode": retrieval_mode,
+        "answer": answer,
+        "answer_card": answer_card.to_dict() if answer_card else None,
+        "sources": [source.to_dict() for source in sources],
+    }
+    path = query_log_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload) + "\n")
 
 
 def rebuild_index() -> dict[str, int]:
@@ -368,25 +561,50 @@ class GridMindHandler(BaseHTTPRequestHandler):
                         web_chunks = web_search_chunks(question, max_results=min(3, top_k))
                         web_results = [(chunk, 0.62) for chunk in web_chunks]
 
-                merged_results = sorted(results + web_results, key=lambda item: item[1], reverse=True)[:top_k]
+                udss_results: list[tuple[object, float]] = []
+                if is_defense_projection_question(question):
+                    udss_results = fetch_udss_context(index=index, question=question, client=client)
+                    udss_results = [(chunk, max(score, 0.74)) for chunk, score in udss_results]
+
+                merged_results = merge_results(
+                    primary_results=results + web_results + udss_results,
+                    extra_results=[],
+                    top_k=top_k + (1 if udss_results else 0),
+                )
+                retrieval_mode = f"{index.provider}+web" if web_results else index.provider
+                if udss_results:
+                    retrieval_mode += "+udss" if "+udss" not in retrieval_mode else ""
+                generated = generate_grounded_answer(
+                    question=question,
+                    results=merged_results,
+                    retrieval_mode=retrieval_mode,
+                )
+                source_chunks = [
+                    SourceChunk(
+                        document_id=chunk.document_id,
+                        title=chunk.title,
+                        chunk_id=chunk.chunk_id,
+                        score=round(score, 4),
+                        text=chunk.text,
+                        provider=getattr(chunk, "provider", "documents"),
+                        url=getattr(chunk, "url", ""),
+                    )
+                    for chunk, score in merged_results
+                ]
+                query_id = uuid4().hex[:12]
                 response = QueryResponse(
-                    answer=generate_grounded_answer(
-                        question=question,
-                        results=merged_results,
-                        retrieval_mode=f"{index.provider}+web" if web_results else index.provider,
-                    ),
-                    sources=[
-                        SourceChunk(
-                            document_id=chunk.document_id,
-                            title=chunk.title,
-                            chunk_id=chunk.chunk_id,
-                            score=round(score, 4),
-                            text=chunk.text,
-                            provider=getattr(chunk, "provider", "documents"),
-                            url=getattr(chunk, "url", ""),
-                        )
-                        for chunk, score in merged_results
-                    ],
+                    answer=generated.text,
+                    answer_card=generated.card,
+                    query_id=query_id,
+                    sources=source_chunks,
+                )
+                append_query_log(
+                    query_id=query_id,
+                    question=question,
+                    retrieval_mode=retrieval_mode,
+                    answer=generated.text,
+                    answer_card=generated.card,
+                    sources=source_chunks,
                 )
                 write_json(self, HTTPStatus.OK, response.to_dict())
                 return

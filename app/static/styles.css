@@ -235,6 +235,10 @@ textarea {
   margin-top: 24px;
 }
 
+.hidden {
+  display: none;
+}
+
 .upload-panel {
   margin-top: 20px;
   padding: 18px;
@@ -273,6 +277,78 @@ textarea {
   white-space: pre-wrap;
   line-height: 1.6;
   min-height: 200px;
+}
+
+.answer-card {
+  margin-bottom: 16px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(110, 231, 200, 0.28);
+  background: linear-gradient(180deg, rgba(13, 29, 49, 0.96), rgba(8, 20, 35, 0.96));
+}
+
+.answer-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.answer-card-label {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.answer-card-title,
+.answer-card-column h5 {
+  margin: 0;
+}
+
+.answer-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: end;
+}
+
+.answer-card-meta span {
+  border: 1px solid rgba(146, 176, 210, 0.2);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+}
+
+.answer-card-summary {
+  margin: 14px 0 0;
+  line-height: 1.6;
+  color: #dce8ff;
+}
+
+.answer-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.answer-card-column {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(5, 14, 25, 0.66);
+}
+
+.answer-card-column ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #d6e4ff;
+  line-height: 1.6;
 }
 
 .sources-list {
@@ -338,12 +414,17 @@ textarea {
   .form-row,
   .upload-actions,
   .response-header,
-  .source-head {
+  .source-head,
+  .answer-card-head {
     flex-direction: column;
     align-items: stretch;
   }
 
   .field-group.compact {
     width: 100%;
+  }
+
+  .answer-card-grid {
+    grid-template-columns: 1fr;
   }
 }

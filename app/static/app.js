@@ -8,6 +8,7 @@ const fileInput = document.getElementById("file-input");
 const queryForm = document.getElementById("query-form");
 const queryStatus = document.getElementById("query-status");
 const answerOutput = document.getElementById("answer-output");
+const answerCard = document.getElementById("answer-card");
 const sourcesList = document.getElementById("sources-list");
 const topKInput = document.getElementById("top-k");
 
@@ -36,6 +37,48 @@ function renderSources(sources) {
       `
     )
     .join("");
+}
+
+function renderAnswerCard(card, queryId) {
+  if (!card || card.mode === "standard") {
+    answerCard.classList.add("hidden");
+    answerCard.innerHTML = "";
+    return;
+  }
+
+  const moreItems = (card.case_for_more || [])
+    .map((item) => `<li>${item}</li>`)
+    .join("");
+  const lessItems = (card.case_for_less || [])
+    .map((item) => `<li>${item}</li>`)
+    .join("");
+
+  answerCard.innerHTML = `
+    <div class="answer-card-head">
+      <div>
+        <p class="answer-card-label">UDSS Projection</p>
+        <h4 class="answer-card-title">${card.final_call || card.lean || "Projection"}</h4>
+      </div>
+      <div class="answer-card-meta">
+        ${card.projection_range ? `<span>Range ${card.projection_range}</span>` : ""}
+        ${card.confidence ? `<span>${card.confidence}</span>` : ""}
+        ${queryId ? `<span>ID ${queryId}</span>` : ""}
+      </div>
+    </div>
+    ${card.summary ? `<p class="answer-card-summary">${card.summary}</p>` : ""}
+    <div class="answer-card-grid">
+      <section class="answer-card-column">
+        <h5>Case For More</h5>
+        <ul>${moreItems || "<li>No strong case was returned.</li>"}</ul>
+      </section>
+      <section class="answer-card-column">
+        <h5>Case For Less</h5>
+        <ul>${lessItems || "<li>No strong case was returned.</li>"}</ul>
+      </section>
+    </div>
+    ${card.final_reason ? `<p class="answer-card-summary"><strong>Why:</strong> ${card.final_reason}</p>` : ""}
+  `;
+  answerCard.classList.remove("hidden");
 }
 
 async function fetchHealth() {
@@ -117,6 +160,8 @@ async function submitQuestion(event) {
   }
 
   queryStatus.textContent = "Retrieving grounded notes...";
+  answerCard.classList.add("hidden");
+  answerCard.innerHTML = "";
   answerOutput.textContent = "Thinking...";
   try {
     const response = await fetch("/query", {
@@ -128,11 +173,14 @@ async function submitQuestion(event) {
     if (!response.ok) {
       throw new Error(payload.error || "Query failed.");
     }
+    renderAnswerCard(payload.answer_card, payload.query_id);
     answerOutput.textContent = payload.answer;
     renderSources(payload.sources || []);
-    queryStatus.textContent = `Retrieved ${payload.sources.length} source chunk(s).`;
+    queryStatus.textContent = `Retrieved ${payload.sources.length} source chunk(s).${payload.query_id ? ` Query ${payload.query_id}.` : ""}`;
   } catch (error) {
     answerOutput.textContent = "The request failed.";
+    answerCard.classList.add("hidden");
+    answerCard.innerHTML = "";
     renderSources([]);
     queryStatus.textContent = error.message;
   }

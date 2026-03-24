@@ -1,59 +1,149 @@
 # GridMind
 
-GridMind is a starter NFL RAG application that lets you ingest football notes, query them, and use a simple built-in web UI.
+GridMind is a hybrid NFL RAG system built around your UDSS sheets.
 
-## What this MVP includes
+It combines:
+- Local private football documents and UDSS knowledge packs
+- Semantic retrieval with OpenAI embeddings and Chroma
+- Lexical fallback retrieval when no API key is set
+- Live web retrieval for current props, stats, projections, and matchup context
+- Guardrailed answer generation that uses UDSS logic for player-vs-defense projection questions
 
-- Lightweight local HTTP service with `/health`, `/documents/ingest`, and `/query`
-- Built-in browser UI served from the same app
-- Local document ingestion from `data/documents`
-- Upload endpoint for `.txt`, `.md`, and `.pdf` notes
-- Chunking pipeline for `.md` and `.txt` sources
-- OpenAI embedding support backed by a persistent Chroma vector database
-- OpenAI grounded answer generation via the Responses API
-- Lexical fallback retrieval when no API key is configured
-- Sample NFL documents so the first query works immediately
+## What It Does
 
-## Project layout
+GridMind is designed to answer two kinds of questions well:
+
+1. Static football knowledge questions from your private notes
+2. Live player prop and matchup questions that need both your UDSS framework and current web context
+
+For projection-style questions such as:
 
 ```text
-nfl-rag-system/
-  app/
-    config.py
-    main.py
-    models.py
-    services/
-  data/
-    documents/
-    index/
-  requirements.txt
-  .env.example
+Should I go higher or lower on Cooper Kupp receiving yards against the Bears defense?
 ```
 
-## Quick start
+the system now:
+- Retrieves relevant UDSS sheets from your local corpus
+- Retrieves current web sources like stats pages, projection pages, and matchup context
+- Uses UDSS as a required guardrail when answering
+- Returns a structured projection response with a lean, confidence, range, and both sides of the case
 
-1. Create and activate a virtual environment.
-2. Install dependencies if you want to extend the project later. The current MVP runs with the Python standard library, so this step is optional:
+## Current Features
+
+- Local HTTP app with:
+  - `/health`
+  - `/documents/ingest`
+  - `/documents/upload`
+  - `/query`
+- Built-in browser UI
+- `.txt`, `.md`, and `.pdf` ingestion
+- Local chunking and manifest generation
+- OpenAI Responses API integration
+- OpenAI embeddings integration
+- Persistent Chroma vector storage
+- Lexical fallback retrieval
+- Web search augmentation for current questions
+- UDSS-aware guardrails for defense-vs-player projection prompts
+- Structured projection output cards in the UI
+- Query logging to `data/index/query_log.jsonl`
+
+## Architecture
+
+```text
+User Question
+  -> Local Retrieval
+     -> UDSS sheets
+     -> football notes
+  -> Web Retrieval
+     -> stats pages
+     -> prop/projection pages
+     -> matchup/news context
+  -> Answer Guardrails
+     -> enforce UDSS framing for projection matchups
+  -> OpenAI Responses generation
+  -> Structured answer returned to UI
+```
+
+Core parts of the app:
+
+```text
+app/
+  config.py
+  main.py
+  models.py
+  services/
+    chunking.py
+    document_store.py
+    openai_embeddings.py
+    openai_responses.py
+    research.py
+    retrieval.py
+    web_retrieval.py
+  static/
+    index.html
+    app.js
+    styles.css
+data/
+  documents/
+  index/
+```
+
+## Quick Start
+
+### 1. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Optional: create a `.env` file from `.env.example` and set `OPENAI_API_KEY` if you want semantic retrieval with OpenAI embeddings and grounded answer generation.
+### 2. Create a `.env`
 
-3. Start the app:
+Copy from `.env.example` and set your OpenAI key if you want semantic retrieval and grounded generation:
+
+```bash
+OPENAI_API_KEY=your-key-here
+```
+
+Example config values:
+
+```bash
+GRIDMIND_DATA_DIR=./data
+GRIDMIND_DOCS_DIR=./data/documents
+GRIDMIND_INDEX_DIR=./data/index
+GRIDMIND_TOP_K=4
+OPENAI_API_KEY=
+GRIDMIND_EMBEDDING_MODEL=text-embedding-3-small
+GRIDMIND_EMBEDDING_DIMENSIONS=512
+GRIDMIND_GENERATION_MODEL=gpt-5-mini
+GRIDMIND_CHROMA_COLLECTION=gridmind_chunks
+```
+
+### 3. Run the app
 
 ```bash
 python -m app.main
 ```
 
-4. Open the UI:
+Or on Windows:
+
+```bash
+py -m app.main
+```
+
+### 4. Open the UI
 
 ```text
 http://127.0.0.1:8000
 ```
 
-5. Rebuild the document index from the browser or with:
+## Usage
+
+### Rebuild the document index
+
+From the UI:
+- Click `Rebuild Document Index`
+
+Or via HTTP:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/documents/ingest ^
@@ -61,31 +151,112 @@ curl -X POST http://127.0.0.1:8000/documents/ingest ^
   -d "{\"rebuild\": true}"
 ```
 
-6. Ask a question from the UI or with:
+### Ask a question
+
+Example:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/query ^
   -H "Content-Type: application/json" ^
-  -d "{\"question\": \"How can a receiver attack Cover 3?\"}"
+  -d "{\"question\": \"Should I go higher or lower on Cooper Kupp receiving yards against the Bears defense?\", \"top_k\": 5}"
 ```
 
-## Uploading your own files
+### Upload your own files
 
-- Use the upload control in the browser UI to add `.txt`, `.md`, or `.pdf` files
+- Upload `.txt`, `.md`, or `.pdf`
 - Uploaded files are normalized into `data/documents`
-- After uploading, click `Rebuild Document Index`
-- PDF parsing requires `pypdf`, so run `pip install -r requirements.txt` if you plan to upload PDFs
+- Rebuild the index after upload
 
-## Vector database
+PDF parsing uses `pypdf`, which is already listed in `requirements.txt`.
 
-- Semantic retrieval is stored in a persistent local Chroma collection under `data/index/chroma`
-- The app still falls back to lexical in-memory retrieval if no OpenAI API key is configured
-- After changing your document set, rebuild the index so Chroma is refreshed
+## How UDSS Is Used
 
-## Next upgrades
+This project is not a generic sports chatbot. The UDSS sheets are part of the system’s reasoning frame.
 
-- Replace the built-in HTTP server with FastAPI once you move to Python 3.12 or a compatible dependency set
-- Add PDF ingestion
-- Replace the built-in UI with a React or Next.js frontend
-- Stream answers over WebSockets
-- Add answer quality and retrieval evaluation
+For player-vs-defense projection questions, the backend:
+- Detects that the question is a projection matchup prompt
+- Pulls UDSS chunks into retrieval context
+- Uses live web evidence for current stats, projections, and matchup arguments
+- Instructs generation to argue both the `Higher` and `Lower` side
+- Returns a final `Higher`, `Lower`, or `Pass` lean
+
+If the retrieved evidence is still too thin, the system is allowed to return `Pass` instead of forcing a bad pick.
+
+## API
+
+### `GET /health`
+
+Returns service status and retrieval mode.
+
+### `POST /documents/ingest`
+
+Rebuilds the retrieval index from `data/documents`.
+
+### `POST /documents/upload`
+
+Uploads a `.txt`, `.md`, or `.pdf` file into the local document store.
+
+### `POST /query`
+
+Request:
+
+```json
+{
+  "question": "Should I go higher or lower on Cooper Kupp receiving yards against the Bears defense?",
+  "top_k": 5
+}
+```
+
+Response shape:
+
+```json
+{
+  "answer": "...",
+  "answer_card": {
+    "mode": "udss_projection",
+    "summary": "...",
+    "lean": "PASS",
+    "projection_range": "50-75 yards",
+    "confidence": "low",
+    "case_for_more": ["..."],
+    "case_for_less": ["..."],
+    "final_call": "...",
+    "final_reason": "..."
+  },
+  "query_id": "abc123def456",
+  "sources": []
+}
+```
+
+## Data And Logs
+
+Generated files live under `data/index/`.
+
+Important outputs:
+- `retrieval_index.json`
+- `documents_manifest.json`
+- `query_log.jsonl`
+- `chroma/`
+
+The Chroma database and query log are gitignored because they are generated locally.
+
+## Notes
+
+- With an OpenAI key set, the app uses semantic retrieval plus grounded generation
+- Without a key, it falls back to lexical retrieval
+- Web retrieval is intentionally simple and lightweight
+- Query logging gives you a replay/debug trail for answers
+
+## Next Improvements
+
+If you want to keep pushing it further, the highest-value upgrades are:
+
+- Evaluation dataset and regression checks
+- Better reranking for web results
+- Cleaner stat extraction from JS-heavy pages
+- Structured UDSS scoring output in addition to prose
+- FastAPI or streaming responses
+
+## License
+
+Private/internal project unless you choose to add a license.
