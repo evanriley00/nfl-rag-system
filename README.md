@@ -1,20 +1,20 @@
 # GridMind
 
-GridMind is a hybrid NFL RAG system built around your UDSS sheets.
+GridMind is a hybrid NFL RAG system.
 
 It combines:
-- Local private football documents and UDSS knowledge packs
+- Local private football documents and knowledge packs
 - Semantic retrieval with OpenAI embeddings and Chroma
 - Lexical fallback retrieval when no API key is set
 - Live web retrieval for current props, stats, projections, and matchup context
-- Guardrailed answer generation that uses UDSS logic for player-vs-defense projection questions
+- Guardrailed answer generation that uses logic for player-vs-defense projection questions
 
 ## What It Does
 
 GridMind is designed to answer two kinds of questions well:
 
 1. Static football knowledge questions from your private notes
-2. Live player prop and matchup questions that need both your UDSS framework and current web context
+2. Live player prop and matchup questions
 
 For projection-style questions such as:
 
@@ -23,9 +23,8 @@ Should I go higher or lower on Cooper Kupp receiving yards against the Bears def
 ```
 
 the system now:
-- Retrieves relevant UDSS sheets from your local corpus
+- Retrieves relevant data sheets from your local corpus
 - Retrieves current web sources like stats pages, projection pages, and matchup context
-- Uses UDSS as a required guardrail when answering
 - Returns a structured projection response with a lean, confidence, range, and both sides of the case
 
 ## Current Features
@@ -43,7 +42,7 @@ the system now:
 - Persistent Chroma vector storage
 - Lexical fallback retrieval
 - Web search augmentation for current questions
-- UDSS-aware guardrails for defense-vs-player projection prompts
+- Guardrails for defense-vs-player projection prompts
 - Structured projection output cards in the UI
 - Query logging to `data/index/query_log.jsonl`
 
@@ -52,14 +51,14 @@ the system now:
 ```text
 User Question
   -> Local Retrieval
-     -> UDSS sheets
+     -> data sheets
      -> football notes
   -> Web Retrieval
      -> stats pages
      -> prop/projection pages
      -> matchup/news context
   -> Answer Guardrails
-     -> enforce UDSS framing for projection matchups
+     -> enforce data framing for projection matchups
   -> OpenAI Responses generation
   -> Structured answer returned to UI
 ```
