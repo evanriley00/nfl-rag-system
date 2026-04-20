@@ -31,7 +31,7 @@ function renderSources(sources) {
             <h3 class="source-title">${source.title}</h3>
             <span class="source-score">score ${source.score}</span>
           </div>
-          <p class="source-meta">${source.provider}${source.url ? ` · <a href="${source.url}" target="_blank" rel="noreferrer">open source</a>` : ""} · ${source.chunk_id}</p>
+          <p class="source-meta">${source.provider}${source.url ? ` - <a href="${source.url}" target="_blank" rel="noreferrer">open source</a>` : ""} - ${source.chunk_id}</p>
           <p class="source-text">${source.text}</p>
         </article>
       `
@@ -88,7 +88,8 @@ async function fetchHealth() {
     setHealth(response.ok);
     if (response.ok && payload.retrieval_provider) {
       const backendLabel = payload.vector_backend ? ` via ${payload.vector_backend}` : "";
-      ingestStatus.textContent = `Retrieval mode: ${payload.retrieval_provider}${payload.embedding_model ? ` (${payload.embedding_model})` : ""}${backendLabel}`;
+      const mlLabel = payload.ml_api_url ? " + wr-yards ml api" : "";
+      ingestStatus.textContent = `Retrieval mode: ${payload.retrieval_provider}${payload.embedding_model ? ` (${payload.embedding_model})` : ""}${backendLabel}${mlLabel}`;
     }
   } catch {
     setHealth(false);

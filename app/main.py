@@ -18,6 +18,11 @@ from app.services.document_store import (
     save_manifest,
     save_uploaded_document,
 )
+from app.services.ml_predictions import (
+    build_prediction_request,
+    fetch_prediction,
+    prediction_to_chunk,
+)
 from app.services.openai_embeddings import OpenAIEmbeddingClient
 from app.services.openai_responses import OpenAIResponsesClient
 from app.services.research import build_research_plan, run_research_plan
@@ -223,6 +228,7 @@ def generate_grounded_answer(
         "Answer only from the provided retrieved context. "
         "Be concise, specific, and practical. "
         "When you use evidence, mention the source titles inline. "
+        "If a source comes from the WR yards ML API, treat it as a model-based prior and combine it with retrieval evidence instead of blindly following it. "
         "If the user asks for a projection, expectation, lean, or prop-style estimate, "
         "you may synthesize a cautious estimate from the retrieved evidence instead of refusing "
         "just because no source gives an explicit forecast. "
@@ -499,6 +505,7 @@ class GridMindHandler(BaseHTTPRequestHandler):
                     "retrieval_provider": active_provider,
                     "embedding_model": settings.embedding_model if settings.openai_api_key else "",
                     "vector_backend": state.index.backend if state.index is not None else "",
+                    "ml_api_url": settings.ml_api_url,
                 },
             )
             return
@@ -542,6 +549,7 @@ class GridMindHandler(BaseHTTPRequestHandler):
                 top_k = max(1, min(top_k, 10))
                 index = ensure_index_loaded()
                 client = embedding_client()
+                response_generation_client = responses_client()
                 if index.provider == "openai":
                     if client is None:
                         raise ValueError(
@@ -552,8 +560,21 @@ class GridMindHandler(BaseHTTPRequestHandler):
                     results = index.search(question, top_k=top_k)
 
                 web_results: list[tuple[object, float]] = []
+                ml_results: list[tuple[object, float]] = []
+                prediction_request = build_prediction_request(
+                    question,
+                    client=response_generation_client,
+                )
+                if prediction_request is not None:
+                    prediction = fetch_prediction(
+                        prediction_request,
+                        base_url=settings.ml_api_url,
+                    )
+                    if prediction is not None:
+                        ml_results = [(prediction_to_chunk(prediction), 0.86)]
+
                 if should_add_web_results(question, results, top_k):
-                    plan = build_research_plan(question, client=responses_client())
+                    plan = build_research_plan(question, client=response_generation_client)
                     researched_chunks = run_research_plan(plan, max_results_per_query=2)
                     if researched_chunks:
                         web_results = [(chunk, 0.68) for chunk in researched_chunks[:top_k]]
@@ -567,11 +588,15 @@ class GridMindHandler(BaseHTTPRequestHandler):
                     udss_results = [(chunk, max(score, 0.74)) for chunk, score in udss_results]
 
                 merged_results = merge_results(
-                    primary_results=results + web_results + udss_results,
+                    primary_results=results + ml_results + web_results + udss_results,
                     extra_results=[],
-                    top_k=top_k + (1 if udss_results else 0),
+                    top_k=top_k + (1 if udss_results else 0) + (1 if ml_results else 0),
                 )
-                retrieval_mode = f"{index.provider}+web" if web_results else index.provider
+                retrieval_mode = index.provider
+                if ml_results:
+                    retrieval_mode += "+ml"
+                if web_results:
+                    retrieval_mode += "+web"
                 if udss_results:
                     retrieval_mode += "+udss" if "+udss" not in retrieval_mode else ""
                 generated = generate_grounded_answer(

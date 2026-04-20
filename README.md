@@ -6,6 +6,7 @@ It combines:
 - Local private football documents and knowledge packs
 - Semantic retrieval with OpenAI embeddings and Chroma
 - Lexical fallback retrieval when no API key is set
+- A live WR receiving-yards ML prediction API for model-based priors
 - Live web retrieval for current props, stats, projections, and matchup context
 - Guardrailed answer generation that uses logic for player-vs-defense projection questions
 
@@ -24,6 +25,7 @@ Should I go higher or lower on Cooper Kupp receiving yards against the Bears def
 
 the system now:
 - Retrieves relevant data sheets from your local corpus
+- Calls a WR receiving-yards ML API when it can identify the player and opposing defense
 - Retrieves current web sources like stats pages, projection pages, and matchup context
 - Returns a structured projection response with a lean, confidence, range, and both sides of the case
 
@@ -39,6 +41,7 @@ the system now:
 - Local chunking and manifest generation
 - OpenAI Responses API integration
 - OpenAI embeddings integration
+- WR receiving-yards ML API integration
 - Persistent Chroma vector storage
 - Lexical fallback retrieval
 - Web search augmentation for current questions
@@ -53,6 +56,8 @@ User Question
   -> Local Retrieval
      -> data sheets
      -> football notes
+  -> WR Yards ML API
+     -> numeric receiving-yards prior
   -> Web Retrieval
      -> stats pages
      -> prop/projection pages
@@ -73,6 +78,7 @@ app/
   services/
     chunking.py
     document_store.py
+    ml_predictions.py
     openai_embeddings.py
     openai_responses.py
     research.py
@@ -115,6 +121,7 @@ GRIDMIND_EMBEDDING_MODEL=text-embedding-3-small
 GRIDMIND_EMBEDDING_DIMENSIONS=512
 GRIDMIND_GENERATION_MODEL=gpt-5-mini
 GRIDMIND_CHROMA_COLLECTION=gridmind_chunks
+GRIDMIND_ML_API_URL=http://nfl-api-alb-2067157598.us-east-2.elb.amazonaws.com
 ```
 
 ### 3. Run the app
@@ -170,7 +177,7 @@ PDF parsing uses `pypdf`, which is already listed in `requirements.txt`.
 
 ## How UDSS Is Used
 
-This project is not a generic sports chatbot. The UDSS sheets are part of the system’s reasoning frame.
+This project is not a generic sports chatbot. The UDSS sheets are part of the system's reasoning frame.
 
 For player-vs-defense projection questions, the backend:
 - Detects that the question is a projection matchup prompt
@@ -243,6 +250,7 @@ The Chroma database and query log are gitignored because they are generated loca
 
 - With an OpenAI key set, the app uses semantic retrieval plus grounded generation
 - Without a key, it falls back to lexical retrieval
+- For WR receiving-yards matchup questions, the app can call an external ML API and include the model output as another grounded source
 - Web retrieval is intentionally simple and lightweight
 - Query logging gives you a replay/debug trail for answers
 

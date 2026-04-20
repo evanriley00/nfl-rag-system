@@ -14,9 +14,9 @@
     <header class="hero">
       <div class="hero-copy">
         <p class="eyebrow">NFL RAG WORKBENCH</p>
-        <h1>GridMind turns your football notes into a searchable scouting assistant.</h1>
+        <h1>GridMind combines your football notes, a WR yards model, and an LLM into one NFL analysis workbench.</h1>
         <p class="hero-text">
-          Ask grounded questions over coverage notes, scouting reports, and matchup summaries.
+          Ask grounded matchup questions over your local scouting documents, live web context, and WR receiving-yards model output.
           Rebuild the index any time your document set changes.
         </p>
       </div>
@@ -51,12 +51,12 @@
 
         <div class="panel-header">
           <h2>Ask the system</h2>
-          <p>Try a football question grounded in the sample documents.</p>
+          <p>Try a football question that blends retrieved notes, live context, and model-assisted projection signals.</p>
         </div>
 
         <form id="query-form" class="query-form">
           <label class="field-label" for="question">Question</label>
-          <textarea id="question" name="question" rows="4" placeholder="How can a receiver stress Cover 3?"></textarea>
+          <textarea id="question" name="question" rows="4" placeholder="Should I go higher or lower on Justin Jefferson receiving yards against the Bears defense?"></textarea>
 
           <div class="form-row">
             <div class="field-group compact">

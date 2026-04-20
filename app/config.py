@@ -31,6 +31,7 @@ class Settings:
     embedding_dimensions: int
     generation_model: str
     chroma_collection_name: str
+    ml_api_url: str
 
 
 def _int_env(name: str, default: int) -> int:
@@ -51,4 +52,8 @@ settings = Settings(
     embedding_dimensions=_int_env("GRIDMIND_EMBEDDING_DIMENSIONS", 512),
     generation_model=os.getenv("GRIDMIND_GENERATION_MODEL", "gpt-5-mini"),
     chroma_collection_name=os.getenv("GRIDMIND_CHROMA_COLLECTION", "gridmind_chunks"),
+    ml_api_url=os.getenv(
+        "GRIDMIND_ML_API_URL",
+        "http://nfl-api-alb-2067157598.us-east-2.elb.amazonaws.com",
+    ).rstrip("/"),
 )
