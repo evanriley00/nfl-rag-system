@@ -246,16 +246,4 @@ The Chroma database and query log are gitignored because they are generated loca
 - Web retrieval is intentionally simple and lightweight
 - Query logging gives you a replay/debug trail for answers
 
-## Next Improvements
 
-If you want to keep pushing it further, the highest-value upgrades are:
-
-- Evaluation dataset and regression checks
-- Better reranking for web results
-- Cleaner stat extraction from JS-heavy pages
-- Structured UDSS scoring output in addition to prose
-- FastAPI or streaming responses
-
-## License
-
-Private/internal project unless you choose to add a license.
